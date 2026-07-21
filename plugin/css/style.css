@@ -83,19 +83,19 @@ body {
   width: 340px; height: 340px;
   left: -120px; top: -100px;
   background: radial-gradient(circle at 35% 35%, #2563EB, transparent 65%);
-  animation: drift-1 16s ease-in-out infinite alternate;
+  animation: drift-1 10s ease-in-out infinite alternate;
 }
 .blob-2 {
   width: 300px; height: 300px;
   right: -110px; top: 30%;
   background: radial-gradient(circle at 60% 40%, #7C3AED, transparent 65%);
-  animation: drift-2 20s ease-in-out infinite alternate;
+  animation: drift-2 13s ease-in-out infinite alternate;
 }
 .blob-3 {
   width: 320px; height: 320px;
   left: 20%; bottom: -140px;
   background: radial-gradient(circle at 50% 50%, #0EA5E9, transparent 65%);
-  animation: drift-3 18s ease-in-out infinite alternate;
+  animation: drift-3 11s ease-in-out infinite alternate;
 }
 @keyframes drift-1 { to { transform: translate(60px, 40px) scale(1.15); } }
 @keyframes drift-2 { to { transform: translate(-50px, -60px) scale(1.1); } }
