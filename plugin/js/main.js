@@ -127,9 +127,42 @@
     } catch (e) {}
   }
 
-  function setStatus(msg, kind) {
-    els.status.textContent = msg || "";
-    els.status.className = "status" + (kind ? " " + kind : "");
+  // --- Двуязычный статус: kk показывается, через 5с плавно меняется на ru ---
+  var SEP = "\u241F"; // невидимый разделитель kk<SEP>ru
+  function bi(kk, ru) { return kk + SEP + ru; }           // собрать двуязычную строку
+  function biErr(kk, ru) { return new Error(bi(kk, ru)); } // двуязычная ошибка
+
+  var statusTimer = null;
+  var statusKind = "";
+  var statusKk = "";
+  var statusRu = "";
+  var statusRuShown = false;
+
+  function renderStatus(text) {
+    els.status.textContent = text || "";
+    els.status.className = "status" + (statusKind ? " " + statusKind : "");
+  }
+
+  // msg может быть двуязычной ("kkru") или обычной; ru — явный перевод.
+  function setStatus(msg, kind, ru) {
+    if (statusTimer) { clearInterval(statusTimer); statusTimer = null; }
+    statusKind = kind || "";
+    var parts = String(msg || "").split(SEP);
+    statusKk = parts[0] || "";
+    statusRu = ru || parts[1] || "";
+    statusRuShown = false;
+    renderStatus(statusKk);
+    if (statusRu && statusRu !== statusKk) {
+      statusTimer = setInterval(swapStatusLang, 5000);
+    }
+  }
+
+  function swapStatusLang() {
+    els.status.classList.add("faded");
+    setTimeout(function () {
+      statusRuShown = !statusRuShown;
+      renderStatus(statusRuShown ? statusRu : statusKk);
+    }, 320);
   }
 
   // Занято: прячем кнопку, показываем неоновый спиннер и цитаты.
@@ -188,7 +221,7 @@
           var text = Buffer.concat(chunks).toString("utf8");
           if (res.statusCode >= 200 && res.statusCode < 300) {
             try { resolve(JSON.parse(text)); }
-            catch (e) { reject(new Error("Сервер жауабы түсініксіз")); }
+            catch (e) { reject(biErr("Сервер жауабы түсініксіз", "Непонятный ответ сервера")); }
           } else {
             reject(new Error("HTTP " + res.statusCode));
           }
@@ -232,21 +265,28 @@
           if (res.statusCode >= 200 && res.statusCode < 300) {
             resolve(text);
           } else if (res.statusCode === 401) {
-            reject(new Error("Кілт қатесі. Қолдау қызметіне жазыңыз."));
+            reject(biErr("Кілт қатесі. Қолдау қызметіне жазыңыз.",
+                         "Ошибка ключа. Напишите в поддержку."));
           } else if (res.statusCode === 402) {
-            reject(new Error("Лимит таусылды. Жазылымды жаңартыңыз."));
+            reject(biErr("Лимит таусылды. Жазылымды жаңартыңыз.",
+                         "Лимит исчерпан. Обновите подписку."));
           } else if (res.statusCode === 403) {
-            reject(new Error("Бұл кілт басқа құрылғыға тіркелген. Қолдау қызметіне жазыңыз."));
+            reject(biErr("Бұл кілт басқа құрылғыға тіркелген. Қолдау қызметіне жазыңыз.",
+                         "Этот ключ привязан к другому устройству. Напишите в поддержку."));
           } else if (res.statusCode === 413) {
-            reject(new Error("Видео тым ұзын."));
+            reject(biErr("Видео тым ұзын.", "Видео слишком длинное."));
           } else {
-            reject(new Error("Сервер қатесі (HTTP " + res.statusCode + ")."));
+            reject(biErr("Сервер қатесі (HTTP " + res.statusCode + ").",
+                         "Ошибка сервера (HTTP " + res.statusCode + ")."));
           }
         });
       });
-      req.setTimeout(UPLOAD_TIMEOUT_MS, function () { req.destroy(new Error("Сервер жауап бермеді.")); });
+      req.setTimeout(UPLOAD_TIMEOUT_MS, function () {
+        req.destroy(biErr("Сервер жауап бермеді.", "Сервер не отвечает."));
+      });
       req.on("error", function (e) {
-        reject(new Error("Байланыс жоқ. Кейінірек қайталап көріңіз."));
+        reject(biErr("Байланыс жоқ. Кейінірек қайталап көріңіз.",
+                     "Нет соединения. Повторите позже."));
       });
       req.write(body);
       req.end();
@@ -261,16 +301,20 @@
 
   function onTest() {
     var apiUrl = els.apiUrl.value.trim();
-    if (!apiUrl) { return setStatus("Сервер адресін көрсетіңіз.", "error"); }
+    if (!apiUrl) {
+      return setStatus("Сервер адресін көрсетіңіз.", "error", "Укажите адрес сервера.");
+    }
     saveSettings();
     els.test.disabled = true;
-    setStatus("Тексерілуде…");
+    setStatus("Тексерілуде…", null, "Проверка…");
     checkHealth(apiUrl)
       .then(function (info) {
-        setStatus("Сервер дайын · " + (info.model || "?"), "ok");
+        var m = info.model || "?";
+        setStatus("Сервер дайын · " + m, "ok", "Сервер готов · " + m);
       })
       .catch(function (err) {
-        setStatus("Байланыс жоқ: " + (err.message || err), "error");
+        var p = String(err && err.message ? err.message : err).split(SEP);
+        setStatus("Байланыс жоқ: " + p[0], "error", "Нет соединения: " + (p[1] || p[0]));
       })
       .then(function () { els.test.disabled = false; });
   }
@@ -285,7 +329,7 @@
         }
         els.presetPath.value = res;
         saveSettings();
-        setStatus("Пресет сақталды.", "ok");
+        setStatus("Пресет сақталды.", "ok", "Пресет сохранён.");
       })
       .then(function () { els.pickPreset.disabled = false; });
   }
@@ -296,10 +340,12 @@
 
     if (!apiKey) {
       els.settingsPanel.classList.remove("hidden");
-      return setStatus("Кілтіңізді енгізіңіз (⚙ баптаулар).", "error");
+      return setStatus("Кілтіңізді енгізіңіз (⚙ баптаулар).", "error",
+                       "Введите ключ (⚙ настройки).");
     }
     if (!apiUrl) {
-      return setStatus("Қате конфигурация. Панельді қайта ашыңыз.", "error");
+      return setStatus("Қате конфигурация. Панельді қайта ашыңыз.", "error",
+                       "Ошибка конфигурации. Переоткройте панель.");
     }
     saveSettings();
     setBusy(true);
@@ -309,7 +355,7 @@
     evalScript('kzsubExportSequenceAudio("' + esc(presetPath) + '")')
       .then(function (wavPath) {
         if (!wavPath || wavPath.indexOf("ERROR:") === 0) {
-          throw new Error(wavPath || "Экспорт сәтсіз.");
+          throw new Error(wavPath || bi("Экспорт сәтсіз.", "Ошибка экспорта."));
         }
         return uploadForSrt(apiUrl, apiKey, wavPath).then(function (srt) {
           return { srt: srt, wavPath: wavPath };
@@ -326,16 +372,19 @@
       })
       .then(function (res) {
         if (res === "INSERTED") {
-          setStatus("Дайын! Субтитрлер таймлайнда.", "ok");
+          setStatus("Дайын! Субтитрлер таймлайнда.", "ok",
+                    "Готово! Субтитры на таймлайне.");
         } else {
           var why = String(res).replace(/^BIN:\s*/, "");
-          setStatus("Субтитрлер жобаға импортталды — таймлайнға сүйреңіз.\n(" + why + ")", "ok");
+          setStatus("Субтитрлер жобаға импортталды — таймлайнға сүйреңіз.\n(" + why + ")", "ok",
+                    "Субтитры импортированы в проект — перетащите на таймлайн.\n(" + why + ")");
         }
       })
       .catch(function (err) {
         var msg = (err && err.message) ? err.message : String(err);
         msg = msg.replace(/^ERROR:\s*/, "");
-        setStatus(msg, "error");
+        var p = msg.split(SEP);
+        setStatus(p[0], "error", p[1] || "");
       })
       .then(function () { setBusy(false); });
   }

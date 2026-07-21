@@ -295,7 +295,9 @@ input[readonly] { color: var(--muted); cursor: default; }
   color: var(--muted);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  transition: opacity 320ms ease;  /* плавная смена языка */
 }
+.status.faded { opacity: 0; }
 .status.ok { color: var(--ok); }
 .status.error { color: var(--error); }
 
