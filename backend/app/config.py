@@ -56,6 +56,20 @@ class Settings:
     # обязательно задайте свои секретные ключи через эту переменную.
     api_keys: str = _get("API_KEYS", "")
 
+    # --- Прокси-режим шлюза: Runpod Serverless GPU ---
+    # Если заданы оба значения ниже, /transcribe НЕ гоняет Whisper локально,
+    # а отправляет аудио в Runpod-эндпоинт. Шлюз тогда можно хостить на
+    # копеечном CPU (ключи/квоты остаются здесь).
+    runpod_endpoint_id: str = _get("RUNPOD_ENDPOINT_ID", "")
+    runpod_api_key: str = _get("RUNPOD_API_KEY", "")
+
+    # Внутренний ключ, который шлюз передаёт воркеру Runpod. На воркере
+    # задайте KZSUB_API_KEYS="<это значение>:pro".
+    runpod_worker_key: str = _get("RUNPOD_WORKER_KEY", "gateway-internal")
+
+    # Сколько ждать результат задания (сек), включая холодный старт GPU.
+    runpod_timeout_seconds: int = _get_int("RUNPOD_TIMEOUT_SECONDS", 900)
+
     # --- Параметры нарезки субтитров (читаемость) ---
     # Максимум символов в одной строке субтитра (норма для читаемости ~42).
     max_line_chars: int = _get_int("MAX_LINE_CHARS", 42)

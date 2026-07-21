@@ -12,11 +12,13 @@ import uuid
 
 from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse
+from starlette.concurrency import run_in_threadpool
 
 from .config import settings
 from .quota import QuotaError, check_and_reserve, commit
+from .runpod_client import RunpodError, transcribe_via_runpod
 from .segmentation import resegment, resegment_words
-from .srt import segments_to_srt
+from .srt import Segment, segments_to_srt
 from .style import apply_style
 from .transcribe import transcribe_file
 
@@ -63,33 +65,52 @@ async def transcribe(
         except QuotaError as e:
             raise HTTPException(status_code=402, detail=str(e))
 
-        try:
-            raw_segments, duration = transcribe_file(tmp_path)
-        except Exception:
-            logger.exception("Ошибка транскрибации")
-            raise HTTPException(status_code=500, detail="Ошибка транскрибации")
+        proxy_mode = bool(settings.runpod_endpoint_id and settings.runpod_api_key)
 
-        # Нарезаем субтитры в выбранном стиле.
-        if settings.caption_style == "word":
-            # Караоке-стиль: одно слово на реплику (предлоги липнут к слову).
-            segments = resegment_words(raw_segments, glue_max_chars=settings.glue_max_chars)
+        if proxy_mode:
+            # Прокси-режим: тяжёлая работа на Runpod GPU. Воркер возвращает уже
+            # нарезанные и оформленные сегменты (общий код в runpod_handler).
+            with open(tmp_path, "rb") as f:
+                audio_bytes = f.read()
+            try:
+                out = await run_in_threadpool(transcribe_via_runpod, audio_bytes, "json")
+            except RunpodError as e:
+                logger.error("Runpod: %s", e)
+                raise HTTPException(status_code=502, detail="Сервис транскрибации недоступен")
+            segments = [
+                Segment(float(s["start"]), float(s["end"]), str(s["text"]))
+                for s in (out.get("segments") or [])
+            ]
+            duration = float(out.get("duration") or 0.0)
         else:
-            # Аккуратные реплики-фразы.
-            segments = resegment(
-                raw_segments,
-                max_line_chars=settings.max_line_chars,
-                max_lines=settings.max_lines,
-                max_cue_seconds=settings.max_cue_seconds,
-                max_gap_seconds=settings.max_gap_seconds,
-            )
+            # Локальный режим: Whisper на этой машине.
+            try:
+                raw_segments, duration = await run_in_threadpool(transcribe_file, tmp_path)
+            except Exception:
+                logger.exception("Ошибка транскрибации")
+                raise HTTPException(status_code=500, detail="Ошибка транскрибации")
 
-        # Оформление: регистр / пунктуация.
-        segments = apply_style(
-            segments,
-            uppercase=settings.uppercase,
-            strip_punctuation=settings.strip_punctuation,
-            punct_keep=settings.punct_keep,
-        )
+            # Нарезаем субтитры в выбранном стиле.
+            if settings.caption_style == "word":
+                # Караоке-стиль: одно слово на реплику (предлоги липнут к слову).
+                segments = resegment_words(raw_segments, glue_max_chars=settings.glue_max_chars)
+            else:
+                # Аккуратные реплики-фразы.
+                segments = resegment(
+                    raw_segments,
+                    max_line_chars=settings.max_line_chars,
+                    max_lines=settings.max_lines,
+                    max_cue_seconds=settings.max_cue_seconds,
+                    max_gap_seconds=settings.max_gap_seconds,
+                )
+
+            # Оформление: регистр / пунктуация.
+            segments = apply_style(
+                segments,
+                uppercase=settings.uppercase,
+                strip_punctuation=settings.strip_punctuation,
+                punct_keep=settings.punct_keep,
+            )
 
         commit(x_api_key, duration or estimated_seconds)
 

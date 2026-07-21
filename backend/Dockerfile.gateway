@@ -1,0 +1,25 @@
+# KZ-SUB Gateway — лёгкий CPU-образ шлюза (прокси-режим).
+# Принимает запросы панели, проверяет ключи/квоты и отправляет аудио в
+# Runpod Serverless GPU. Whisper здесь НЕ запускается, образ маленький.
+#
+# Сборка (из папки backend/):
+#   docker build -f Dockerfile.gateway -t kzsub-gateway .
+# Запуск:
+#   docker run -p 8000:8000 \
+#     -e KZSUB_API_KEYS="ключ-пользователя:pro,триал:free" \
+#     -e KZSUB_RUNPOD_ENDPOINT_ID=xxxx \
+#     -e KZSUB_RUNPOD_API_KEY=rp_xxxx \
+#     -e KZSUB_RUNPOD_WORKER_KEY=gateway-internal \
+#     kzsub-gateway
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements-gateway.txt .
+RUN pip install --no-cache-dir -r requirements-gateway.txt
+
+COPY app ./app
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

@@ -49,14 +49,45 @@ GPU быстрее реального времени). Прочувствуй: 1
 4. Тест: POST на `https://api.runpod.ai/v2/<endpoint-id>/runsync` с JSON
    `{"input": {"api_key": "...", "audio_base64": "..."}}`.
 
-**Оговорка про панель:** у Runpod свой формат запросов (`/runsync`, JSON,
-base64), а панель говорит с нашим API (`/transcribe`, multipart). Два пути:
-- **Шлюз (рекомендую):** поднять наш FastAPI на копеечном CPU-хостинге
-  (Fly.io/Railway/любой $3–5 VPS) и научить его проксировать тяжёлую работу в
-  Runpod. Панель не меняется, ключи/квоты — централизованно. (Следующий шаг
-  разработки — «прокси-режим» в бэкенде.)
-- Либо научить панель протоколу Runpod напрямую (без шлюза, но ключи Runpod
-  уедут в панель — хуже для безопасности).
+**Прокси-режим (реализован):** панель говорит со ШЛЮЗОМ — нашим FastAPI на
+копеечном CPU-хостинге; шлюз проверяет ключи/квоты и гоняет аудио в Runpod.
+Runpod-ключ живёт только на шлюзе.
+
+### Полный деплой за 6 шагов
+
+1. **Собери и запушь GPU-образ воркера** (нужен Docker Hub):
+   ```bash
+   cd backend
+   docker build -f serverless/Dockerfile.runpod -t <you>/kzsub-runpod:v1 .
+   docker push <you>/kzsub-runpod:v1
+   ```
+2. **Runpod → Serverless → New Endpoint**: образ `<you>/kzsub-runpod:v1`,
+   GPU 24 GB (4090/A5000), Max Workers 1–2, Idle Timeout 5–10 с, env:
+   `KZSUB_API_KEYS=gateway-internal:pro`.
+   Запиши **Endpoint ID** и создай **Runpod API Key** (Settings → API Keys).
+3. **Собери образ шлюза**:
+   ```bash
+   docker build -f Dockerfile.gateway -t <you>/kzsub-gateway:v1 .
+   docker push <you>/kzsub-gateway:v1
+   ```
+4. **Разверни шлюз** на любом CPU-хостинге с HTTPS (Fly.io / Railway /
+   Render / $5 VPS + Caddy) с переменными:
+   ```
+   KZSUB_API_KEYS=<секретный-ключ-1>:pro,<триальный>:free
+   KZSUB_RUNPOD_ENDPOINT_ID=<endpoint id из шага 2>
+   KZSUB_RUNPOD_API_KEY=<runpod api key>
+   KZSUB_RUNPOD_WORKER_KEY=gateway-internal
+   ```
+5. **Проверь**: `curl https://<шлюз>/health`, затем тестовая транскрибация
+   с ключом из KZSUB_API_KEYS.
+6. **Направь панель**: в `plugin/index.html` поставь URL шлюза значением по
+   умолчанию поля `#apiUrl` (и ключ пользователя — в `#apiKey` через
+   localStorage при выдаче), собери ZXP и раздавай.
+
+> Первый запрос после простоя будет с «холодным стартом» GPU (десятки секунд —
+> качаются веса, если не используешь Network Volume). Совет: включи в Runpod
+> **FlashBoot** и/или прикрепи **Network Volume** с кэшем HuggingFace —
+> старт станет заметно быстрее.
 
 ## Деплой контейнера (общая схема, подходит любому провайдеру)
 

@@ -83,3 +83,46 @@ def test_transcribe_json_format(client):
 def test_invalid_key_rejected(client):
     r = client.post("/transcribe", files=_audio_file(), headers={"X-API-Key": "bogus"})
     assert r.status_code == 402  # QuotaError -> 402
+
+
+def test_proxy_mode_returns_srt(client, monkeypatch):
+    """Прокси-режим: сегменты приходят готовыми от Runpod-воркера."""
+    from app.config import settings as cfg
+
+    monkeypatch.setattr(cfg, "runpod_endpoint_id", "ep123")
+    monkeypatch.setattr(cfg, "runpod_api_key", "rp_secret")
+
+    def fake_runpod(audio_bytes, fmt="json"):
+        assert isinstance(audio_bytes, bytes) and len(audio_bytes) > 0
+        return {
+            "language": "kk",
+            "duration": 2.0,
+            "segments": [
+                {"start": 0.0, "end": 1.0, "text": "СӘЛЕМ"},
+                {"start": 1.0, "end": 2.0, "text": "ӘЛЕМ!"},
+            ],
+        }
+
+    monkeypatch.setattr(main, "transcribe_via_runpod", fake_runpod)
+
+    r = client.post("/transcribe", files=_audio_file(), headers={"X-API-Key": "dev-key"})
+    assert r.status_code == 200
+    assert "СӘЛЕМ" in r.text
+    assert "ӘЛЕМ!" in r.text
+    assert "00:00:01,000 --> 00:00:02,000" in r.text
+
+
+def test_proxy_mode_runpod_error_is_502(client, monkeypatch):
+    from app.config import settings as cfg
+    from app.runpod_client import RunpodError
+
+    monkeypatch.setattr(cfg, "runpod_endpoint_id", "ep123")
+    monkeypatch.setattr(cfg, "runpod_api_key", "rp_secret")
+
+    def broken(audio_bytes, fmt="json"):
+        raise RunpodError("boom")
+
+    monkeypatch.setattr(main, "transcribe_via_runpod", broken)
+
+    r = client.post("/transcribe", files=_audio_file(), headers={"X-API-Key": "dev-key"})
+    assert r.status_code == 502

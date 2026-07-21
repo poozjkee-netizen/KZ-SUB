@@ -39,7 +39,8 @@
 - ✅ Контейнеризация (Dockerfile CPU + GPU, docker-compose)
 - ✅ API-ключи из окружения (KZSUB_API_KEYS) вместо захардкоженных
 - ✅ Гайд по хостингу (serverless-GPU / VPS) — docs/HOSTING.md
-- 🔨 Поднять бэкенд на публичном HTTPS (serverless-GPU)
+- ✅ Прокси-режим шлюза (панель → CPU-шлюз → Runpod GPU), Dockerfile.gateway
+- 🔨 Поднять шлюз + Runpod-эндпоинт на публичном HTTPS (шаги в HOSTING.md)
 - 🔨 Реальная аутентификация (пользователи, токены) + регистрация на сайте
 - 🔨 Постоянная квота (Postgres/Redis) + связка с подпиской (Kaspi/Stripe)
 - 🔨 Очередь задач + пул GPU-воркеров + автоскейл
