@@ -227,7 +227,8 @@ input[readonly] { color: var(--muted); cursor: default; }
   width: 100%;
   max-width: 300px;
   height: 52px;
-  font-size: 15px; font-weight: 600;
+  font-size: 14px; font-weight: 700;
+  letter-spacing: 0.04em;
   font-family: inherit;
   color: #fff;
   background: var(--grad);
