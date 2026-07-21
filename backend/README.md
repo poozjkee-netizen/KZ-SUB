@@ -53,7 +53,13 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 
 ## Тесты
 ```bash
-python tests/test_srt.py   # без тяжёлых зависимостей
+# Без тяжёлых зависимостей (чистая логика):
+python tests/test_srt.py
+python tests/test_quota.py
+
+# Интеграционный тест HTTP-контракта /transcribe (нужен fastapi/httpx,
+# модель Whisper замокана — GPU/веса не требуются):
+pytest tests/test_api.py
 ```
 
 ## Что здесь заглушка (доработать для прода)

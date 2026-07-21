@@ -1,32 +1,48 @@
-"""Конфигурация бэкенда. Всё переопределяется через переменные окружения (.env)."""
-from pydantic_settings import BaseSettings, SettingsConfigDict
+"""Конфигурация бэкенда.
+
+Значения читаются из переменных окружения с префиксом ``KZSUB_`` (можно через
+файл ``.env``, если он загружен окружением). Намеренно без внешних зависимостей —
+чтобы core-логика (srt/quota) была тестируемой без установки тяжёлых пакетов.
+"""
+from __future__ import annotations
+
+import os
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="KZSUB_", env_file=".env", extra="ignore")
+def _get(name: str, default: str) -> str:
+    return os.environ.get(f"KZSUB_{name}", default)
 
+
+def _get_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(f"KZSUB_{name}", str(default)))
+    except ValueError:
+        return default
+
+
+class Settings:
     # Модель Whisper. Для казахского минимально пригоден "large-v3".
     # Меньшие модели ("medium", "small") заметно хуже на казахском — использовать
     # только для быстрых локальных тестов.
-    whisper_model: str = "large-v3"
+    whisper_model: str = _get("WHISPER_MODEL", "large-v3")
 
     # "cpu" | "cuda". На проде — cuda (GPU), иначе транскрибация медленная.
-    device: str = "cpu"
+    device: str = _get("DEVICE", "cpu")
 
     # Тип вычислений faster-whisper: "int8" (cpu), "float16" (gpu) и т.п.
-    compute_type: str = "int8"
+    compute_type: str = _get("COMPUTE_TYPE", "int8")
 
     # Язык фиксируем: продукт про казахский.
-    language: str = "kk"
+    language: str = _get("LANGUAGE", "kk")
 
     # Бесплатная квота (минуты аудио в месяц) для ключей без подписки.
-    free_minutes_per_month: int = 30
+    free_minutes_per_month: int = _get_int("FREE_MINUTES_PER_MONTH", 30)
 
     # Максимальная длительность одного файла (сек), защита от абьюза.
-    max_audio_seconds: int = 60 * 90  # 1.5 часа
+    max_audio_seconds: int = _get_int("MAX_AUDIO_SECONDS", 60 * 90)  # 1.5 часа
 
     # Директория для временных файлов.
-    tmp_dir: str = "tmp"
+    tmp_dir: str = _get("TMP_DIR", "tmp")
 
 
 settings = Settings()

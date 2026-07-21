@@ -12,6 +12,24 @@
  */
 
 /**
+ * Открывает системный диалог выбора файла .epr и возвращает путь.
+ * @returns {string} путь, "CANCEL" при отмене, или "ERROR: ..."
+ */
+function kzsubPickPreset() {
+    try {
+        // Фильтр по расширению отличается на Win/Mac; File.openDialog сам
+        // подберёт подходящее поведение по платформе.
+        var f = File.openDialog("Аудио-пресетті таңдаңыз (.epr)", "*.epr");
+        if (!f) {
+            return "CANCEL";
+        }
+        return f.fsName;
+    } catch (e) {
+        return "ERROR: " + e.toString();
+    }
+}
+
+/**
  * Экспортирует аудио активной секвенции во временный WAV.
  * @param {string} presetPath  абсолютный путь к .epr аудио-пресету
  * @returns {string} путь к WAV или "ERROR: ..."
@@ -25,8 +43,9 @@ function kzsubExportSequenceAudio(presetPath) {
 
         var preset = new File(presetPath);
         if (!preset.exists) {
-            return "ERROR: Не найден аудио-пресет: " + presetPath +
-                   " (см. plugin/presets/README).";
+            return "ERROR: Аудио-пресет табылмады. Панельдегі «Таңдау» " +
+                   "батырмасымен .epr пресетін көрсетіңіз (немесе plugin/presets/ " +
+                   "ішіне audio_wav.epr қойыңыз).";
         }
 
         var outFile = new File(Folder.temp.fsName + "/kzsub_" + Date.now() + ".wav");

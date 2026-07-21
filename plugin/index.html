@@ -16,11 +16,23 @@
     <section class="settings">
       <label class="field">
         <span>API URL</span>
-        <input id="apiUrl" type="text" value="http://localhost:8000" />
+        <div class="row">
+          <input id="apiUrl" type="text" value="http://localhost:8000" />
+          <button id="test" class="ghost" title="Байланысты тексеру">Тест</button>
+        </div>
       </label>
+
       <label class="field">
         <span>API-кілт (X-API-Key)</span>
         <input id="apiKey" type="password" placeholder="dev-key" />
+      </label>
+
+      <label class="field">
+        <span>Аудио-пресет (.epr)</span>
+        <div class="row">
+          <input id="presetPath" type="text" placeholder="Пресет таңдаңыз…" readonly />
+          <button id="pickPreset" class="ghost" title="Пресет таңдау">Таңдау</button>
+        </div>
       </label>
     </section>
 
@@ -33,11 +45,6 @@
     </footer>
   </div>
 
-  <!--
-    CSInterface.js — официальная библиотека Adobe CEP.
-    Скачайте из https://github.com/Adobe-CEP/CEP-Resources
-    (папка CEP_<версия>/CSInterface.js) и положите рядом как js/CSInterface.js.
-  -->
   <script src="js/CSInterface.js"></script>
   <script src="js/main.js"></script>
 </body>
