@@ -55,5 +55,6 @@ MVP-каркас. Что работает / что требует доработ
 ## Документация
 
 - [Архитектура](docs/ARCHITECTURE.md)
+- [Хостинг (деплой бэкенда для всех)](docs/HOSTING.md)
 - [Монетизация и юнит-экономика](docs/MONETIZATION.md)
 - [Roadmap](docs/ROADMAP.md)

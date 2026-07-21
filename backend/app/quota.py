@@ -23,12 +23,30 @@ class _Usage:
     period_start: float = field(default_factory=time.time)
 
 
-# Демонстрационный набор ключей. В проде — БД пользователей/подписок.
+def _load_keys() -> dict[str, str]:
+    """Ключи из настроек (KZSUB_API_KEYS="key:tier,..."), иначе dev-дефолты.
+
+    В проде задавайте свои секретные ключи через переменную окружения — иначе
+    работают общеизвестные dev-ключи, и любой сможет пользоваться бесплатно.
+    """
+    raw = settings.api_keys.strip()
+    if not raw:
+        return {"dev-key": "pro", "free-demo": "free"}
+    keys: dict[str, str] = {}
+    for pair in raw.split(","):
+        pair = pair.strip()
+        if not pair:
+            continue
+        if ":" in pair:
+            k, tier = pair.split(":", 1)
+            keys[k.strip()] = (tier.strip() or "free")
+        else:
+            keys[pair] = "pro"
+    return keys
+
+
 # tier: "free" -> free_minutes_per_month; "pro"/"studio" -> без жёсткого лимита здесь.
-_KEYS: dict[str, str] = {
-    "dev-key": "pro",       # ключ для локальной разработки
-    "free-demo": "free",    # демонстрация бесплатного лимита
-}
+_KEYS: dict[str, str] = _load_keys()
 
 _usage: dict[str, _Usage] = {}
 _MONTH_SECONDS = 30 * 24 * 3600

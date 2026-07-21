@@ -48,6 +48,7 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_WHISPER_MODEL`         | `large-v3`   | модель Whisper                      |
 | `KZSUB_DEVICE`                | `cpu`        | `cpu` / `cuda`                      |
 | `KZSUB_COMPUTE_TYPE`          | `int8`       | тип вычислений                      |
+| `KZSUB_API_KEYS`              | (пусто→dev)  | `ключ:тариф,...` — свои ключи на проде |
 | `KZSUB_FREE_MINUTES_PER_MONTH`| `30`         | бесплатный лимит                    |
 | `KZSUB_MAX_AUDIO_SECONDS`     | `5400`       | лимит длительности файла            |
 | `KZSUB_CAPTION_STYLE`         | `word`       | `word` (караоке, по слову) / `phrase` (фразы) |

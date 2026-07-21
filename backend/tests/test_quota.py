@@ -47,6 +47,29 @@ def test_free_key_exceeds_limit():
         pass
 
 
+def test_load_keys_defaults_when_empty():
+    old = settings.api_keys
+    try:
+        settings.api_keys = ""
+        keys = quota._load_keys()
+        assert keys == {"dev-key": "pro", "free-demo": "free"}
+    finally:
+        settings.api_keys = old
+
+
+def test_load_keys_from_env_string():
+    old = settings.api_keys
+    try:
+        settings.api_keys = "abc123:pro, freeuser:free , loner"
+        keys = quota._load_keys()
+        assert keys["abc123"] == "pro"
+        assert keys["freeuser"] == "free"
+        assert keys["loner"] == "pro"          # без тарифа -> pro
+        assert "dev-key" not in keys           # дефолты не подмешиваются
+    finally:
+        settings.api_keys = old
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

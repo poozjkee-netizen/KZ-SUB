@@ -1,0 +1,27 @@
+# KZ-SUB API — GPU-образ (NVIDIA CUDA + cuDNN).
+# Запуск требует хоста с NVIDIA GPU и nvidia-container-toolkit
+# (docker run --gpus all ...). В разы быстрее CPU на large-v3.
+#
+# Версии CUDA/cuDNN должны совпадать с тем, что ожидает ctranslate2 в вашей
+# версии faster-whisper. Если при старте будут ошибки загрузки cudnn — сверьте
+# требования faster-whisper и при необходимости смените тег базового образа.
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-pip ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+
+ENV KZSUB_DEVICE=cuda \
+    KZSUB_COMPUTE_TYPE=float16 \
+    KZSUB_WHISPER_MODEL=large-v3
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

@@ -1,0 +1,30 @@
+# Быстрый self-host бэкенда KZ-SUB (CPU).
+#   docker compose up --build
+#
+# Для GPU: заменить dockerfile на Dockerfile.gpu, добавить в сервис
+#   deploy.resources.reservations.devices (или `docker run --gpus all`),
+# и KZSUB_DEVICE=cuda / KZSUB_COMPUTE_TYPE=float16.
+#
+# Веса модели (~3 ГБ) кэшируются в томе hfcache — не качаются заново при
+# перезапуске контейнера.
+
+services:
+  kzsub-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      KZSUB_WHISPER_MODEL: large-v3
+      KZSUB_DEVICE: cpu
+      KZSUB_COMPUTE_TYPE: int8
+      KZSUB_CAPTION_STYLE: word
+      # ОБЯЗАТЕЛЬНО на проде: свои секретные ключи вместо dev-key.
+      # KZSUB_API_KEYS: "your-secret-key:pro,trial-user:free"
+    volumes:
+      - hfcache:/root/.cache/huggingface
+    restart: unless-stopped
+
+volumes:
+  hfcache:

@@ -1,0 +1,10 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+tmp/
+tests/
+*.wav
+*.mp3
+*.srt
+.env
