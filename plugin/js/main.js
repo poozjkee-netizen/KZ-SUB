@@ -18,6 +18,17 @@
   var http = require("http");
   var https = require("https");
   var urlmod = require("url");
+  var crypto = require("crypto");
+
+  // Стабильный отпечаток устройства (анти-шаринг ключа): хэш от имени машины,
+  // пользователя и платформы. Не содержит личных данных в открытом виде.
+  function deviceId() {
+    var user = "";
+    try { user = os.userInfo().username; } catch (e) {}
+    var raw = [os.hostname(), user, os.platform(), os.arch()].join("|");
+    return crypto.createHash("sha256").update(raw).digest("hex").slice(0, 32);
+  }
+  var DEVICE_ID = deviceId();
 
   var UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
   var HEALTH_TIMEOUT_MS = 8 * 1000;
@@ -210,6 +221,7 @@
         "Content-Type": "multipart/form-data; boundary=" + boundary,
         "Content-Length": body.length,
         "X-API-Key": apiKey,
+        "X-Device-Id": DEVICE_ID,
       };
 
       var req = u.lib.request(opts, function (res) {
@@ -223,6 +235,8 @@
             reject(new Error("Кілт қатесі. Қолдау қызметіне жазыңыз."));
           } else if (res.statusCode === 402) {
             reject(new Error("Лимит таусылды. Жазылымды жаңартыңыз."));
+          } else if (res.statusCode === 403) {
+            reject(new Error("Бұл кілт басқа құрылғыға тіркелген. Қолдау қызметіне жазыңыз."));
           } else if (res.statusCode === 413) {
             reject(new Error("Видео тым ұзын."));
           } else {

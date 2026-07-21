@@ -23,7 +23,10 @@ from app.asr_types import RawSegment, Word  # noqa: E402
 
 @pytest.fixture
 def client(monkeypatch):
+    from app import devices
     quota._usage.clear()
+    devices._bindings.clear()
+    devices._loaded = True  # не читать состояние с диска в тестах
 
     def fake_transcribe(path):
         # Пословные тайм-коды; большой разрыв (2.5 - 1.2 = 1.3с) между репликами
@@ -49,6 +52,10 @@ def _audio_file():
     return {"file": ("clip.wav", b"\x00" * 1024, "audio/wav")}
 
 
+def _headers(key="dev-key", device="test-device-1"):
+    return {"X-API-Key": key, "X-Device-Id": device}
+
+
 def test_health(client):
     r = client.get("/health")
     assert r.status_code == 200
@@ -61,7 +68,7 @@ def test_requires_api_key(client):
 
 
 def test_transcribe_returns_srt(client):
-    r = client.post("/transcribe", files=_audio_file(), headers={"X-API-Key": "dev-key"})
+    r = client.post("/transcribe", files=_audio_file(), headers=_headers())
     assert r.status_code == 200
     body = r.text
     assert "00:00:00,000 --> 00:00:01,200" in body
@@ -70,7 +77,7 @@ def test_transcribe_returns_srt(client):
 
 def test_transcribe_json_format(client):
     r = client.post(
-        "/transcribe?fmt=json", files=_audio_file(), headers={"X-API-Key": "dev-key"}
+        "/transcribe?fmt=json", files=_audio_file(), headers=_headers()
     )
     assert r.status_code == 200
     data = r.json()
@@ -81,8 +88,29 @@ def test_transcribe_json_format(client):
 
 
 def test_invalid_key_rejected(client):
-    r = client.post("/transcribe", files=_audio_file(), headers={"X-API-Key": "bogus"})
+    r = client.post("/transcribe", files=_audio_file(), headers=_headers(key="bogus"))
     assert r.status_code == 402  # QuotaError -> 402
+
+
+def test_device_limit_enforced(client, monkeypatch):
+    """Третье устройство на одном ключе получает 403."""
+    from app.config import settings as cfg
+    monkeypatch.setattr(cfg, "max_devices_per_key", 2)
+
+    for dev in ("dev-1", "dev-2"):
+        r = client.post("/transcribe", files=_audio_file(), headers=_headers(device=dev))
+        assert r.status_code == 200
+    # повторно с известного устройства — ок
+    r = client.post("/transcribe", files=_audio_file(), headers=_headers(device="dev-1"))
+    assert r.status_code == 200
+    # новое третье устройство — отказ
+    r = client.post("/transcribe", files=_audio_file(), headers=_headers(device="dev-3"))
+    assert r.status_code == 403
+
+
+def test_missing_device_header_rejected(client):
+    r = client.post("/transcribe", files=_audio_file(), headers={"X-API-Key": "dev-key"})
+    assert r.status_code == 403
 
 
 def test_proxy_mode_returns_srt(client, monkeypatch):
@@ -105,7 +133,7 @@ def test_proxy_mode_returns_srt(client, monkeypatch):
 
     monkeypatch.setattr(main, "transcribe_via_runpod", fake_runpod)
 
-    r = client.post("/transcribe", files=_audio_file(), headers={"X-API-Key": "dev-key"})
+    r = client.post("/transcribe", files=_audio_file(), headers=_headers())
     assert r.status_code == 200
     assert "СӘЛЕМ" in r.text
     assert "ӘЛЕМ!" in r.text
@@ -124,5 +152,5 @@ def test_proxy_mode_runpod_error_is_502(client, monkeypatch):
 
     monkeypatch.setattr(main, "transcribe_via_runpod", broken)
 
-    r = client.post("/transcribe", files=_audio_file(), headers={"X-API-Key": "dev-key"})
+    r = client.post("/transcribe", files=_audio_file(), headers=_headers())
     assert r.status_code == 502

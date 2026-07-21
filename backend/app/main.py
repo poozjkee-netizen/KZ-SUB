@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
 from .config import settings
+from .devices import DeviceLimitError, check_device
 from .quota import QuotaError, check_and_reserve, commit
 from .runpod_client import RunpodError, transcribe_via_runpod
 from .segmentation import resegment, resegment_words
@@ -39,10 +40,17 @@ def health() -> dict:
 async def transcribe(
     file: UploadFile = File(...),
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_device_id: str | None = Header(default=None, alias="X-Device-Id"),
     fmt: str = Query(default="srt", description="Формат ответа: 'srt' или 'json'"),
 ):
     if not x_api_key:
         raise HTTPException(status_code=401, detail="Требуется заголовок X-API-Key")
+
+    # Анти-шаринг: ключ работает максимум на N устройствах.
+    try:
+        check_device(x_api_key, (x_device_id or "").strip())
+    except DeviceLimitError as e:
+        raise HTTPException(status_code=403, detail=str(e))
 
     # Сохраняем загруженный файл во временную директорию.
     tmp_path = os.path.join(settings.tmp_dir, f"{uuid.uuid4().hex}_{file.filename or 'audio'}")

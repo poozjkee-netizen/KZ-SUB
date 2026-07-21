@@ -7,6 +7,15 @@ primary_region = "fra"   # Франкфурт — ближайший крупн�
 [build]
   dockerfile = "Dockerfile.gateway"
 
+[env]
+  KZSUB_STATE_DIR = "/data"
+
+# Постоянный том: привязки ключей к устройствам переживают рестарты.
+# Один раз создать: fly volumes create kzsub_data --region fra --size 1 -y
+[[mounts]]
+  source = "kzsub_data"
+  destination = "/data"
+
 [http_service]
   internal_port = 8000
   force_https = true
