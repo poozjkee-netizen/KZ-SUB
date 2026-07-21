@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Порт удалённой отладки CEP-панели (Chrome DevTools).
+  При включённом debug-режиме CEP откройте в браузере http://localhost:8088
+  во время работы Premiere, чтобы дебажить панель.
+-->
+<ExtensionList>
+  <Extension Id="kz.kzsub.panel.main">
+    <HostList>
+      <Host Name="PPRO" Port="8088" />
+    </HostList>
+  </Extension>
+</ExtensionList>

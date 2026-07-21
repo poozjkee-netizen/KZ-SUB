@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Models / weights (большие, качаются отдельно)
+models/
+*.bin
+*.pt
+*.gguf
+
+# Аудио/видео артефакты обработки
+backend/tmp/
+*.wav
+*.mp3
+*.m4a
+*.srt
+!backend/tests/**/*.srt
+!backend/tests/**/*.wav
+
+# Секреты и окружение
+.env
+*.env
+secrets/
+
+# CEP / плагин
+plugin/*.zxp
+plugin/node_modules/
+
+# ОС/редакторы
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

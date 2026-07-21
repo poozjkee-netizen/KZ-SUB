@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KZ-SUB</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>KZ-SUB</h1>
+      <p class="sub">Қазақша авто-субтитр · Premiere Pro</p>
+    </header>
+
+    <section class="settings">
+      <label class="field">
+        <span>API URL</span>
+        <input id="apiUrl" type="text" value="http://localhost:8000" />
+      </label>
+      <label class="field">
+        <span>API-кілт (X-API-Key)</span>
+        <input id="apiKey" type="password" placeholder="dev-key" />
+      </label>
+    </section>
+
+    <button id="run" class="primary">Субтитр жасау</button>
+
+    <div id="status" class="status" aria-live="polite"></div>
+
+    <footer class="footer">
+      <div id="quota" class="quota"></div>
+    </footer>
+  </div>
+
+  <!--
+    CSInterface.js — официальная библиотека Adobe CEP.
+    Скачайте из https://github.com/Adobe-CEP/CEP-Resources
+    (папка CEP_<версия>/CSInterface.js) и положите рядом как js/CSInterface.js.
+  -->
+  <script src="js/CSInterface.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
