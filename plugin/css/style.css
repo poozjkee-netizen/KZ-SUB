@@ -117,16 +117,9 @@ body {
   align-items: center;
   justify-content: space-between;
 }
-.brand { display: flex; align-items: center; gap: 9px; }
-.logo {
-  width: 32px; height: 32px;
-  display: grid; place-items: center;
-  border-radius: 10px;
-  color: #fff;
-  background: var(--grad);
-  box-shadow: 0 0 18px rgba(79, 106, 245, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-}
-.brand-name { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; }
+.brand { display: flex; align-items: center; gap: 8px; }
+.ig-icon { color: #fff; flex: none; }
+.brand-name { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; color: #fff; }
 
 .top-actions { display: flex; align-items: center; gap: 8px; }
 
