@@ -44,11 +44,26 @@ if [ ! -f "$CERT" ]; then
           "$CERT_PASS" "$CERT"
 fi
 
-# 2. Подпись плагина в .zxp (с временной меткой — подпись не «протухает»).
+# 2. Подпись плагина в .zxp.
+# Временная метка (TSA) желательна, но если сервер недоступен — подписываем без
+# неё (для прямой раздачи клиентам это нормально). Отключить принудительно:
+# KZSUB_TSA= bash scripts/build-zxp.sh
+TSA="${KZSUB_TSA-http://timestamp.digicert.com}"
 echo "==> Подписываю плагин в .zxp…"
 rm -f "$ZXP"
-"$SIGN" -sign "$PLUGIN" "$ZXP" "$CERT" "$CERT_PASS" \
-        -tsa https://timestamp.digicert.com
+
+signed=0
+if [ -n "$TSA" ]; then
+  if "$SIGN" -sign "$PLUGIN" "$ZXP" "$CERT" "$CERT_PASS" -tsa "$TSA"; then
+    signed=1
+  else
+    echo "   TSA недоступен — подписываю без временной метки…"
+    rm -f "$ZXP"
+  fi
+fi
+if [ "$signed" -eq 0 ]; then
+  "$SIGN" -sign "$PLUGIN" "$ZXP" "$CERT" "$CERT_PASS"
+fi
 
 echo ""
 echo "Готово: $ZXP"
