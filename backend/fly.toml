@@ -1,0 +1,19 @@
+# Fly.io конфиг шлюза KZ-SUB (прокси-режим -> Runpod).
+# Деплой:  flyctl launch --copy-config --no-deploy   затем   flyctl deploy --remote-only
+# Секреты: flyctl secrets set KZSUB_API_KEYS=... KZSUB_RUNPOD_ENDPOINT_ID=... KZSUB_RUNPOD_API_KEY=...
+app = "kzsub-gateway"
+primary_region = "fra"   # Франкфурт — ближайший крупный регион к KZ
+
+[build]
+  dockerfile = "Dockerfile.gateway"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"    # засыпает без трафика (экономия)
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

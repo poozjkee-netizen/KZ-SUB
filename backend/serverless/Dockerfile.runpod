@@ -13,6 +13,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt runpod
 
+# Запекаем веса large-v3 в образ (~3 ГБ): иначе каждый холодный старт воркера
+# качал бы их из интернета минутами. Образ толще, зато старт быстрее и дешевле.
+ENV HF_HOME=/root/.cache/huggingface
+RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download('Systran/faster-whisper-large-v3')"
+
 COPY app ./app
 COPY serverless ./serverless
 
