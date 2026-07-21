@@ -30,20 +30,23 @@
 | `plugin/`    | CEP-панель для Premiere Pro (UI, выгрузка аудио, импорт субтитров) |
 | `docs/`      | Архитектура, монетизация, roadmap                                 |
 
-## Быстрый старт (разработка)
+## Быстрый старт
 
-### Бэкенд
+**Первый запуск в Premiere — по шагам:** [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
+
+Кратко:
 ```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-Проверка: `curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" http://localhost:8000/transcribe -o out.srt`
+# 1. Установить панель в Premiere (macOS)
+bash scripts/install-macos.sh          # Windows: scripts\install-windows.ps1
 
-### Плагин
-См. [`plugin/README.md`](plugin/README.md) — установка CEP-панели в режиме
-разработки (включение debug-режима CEP и симлинк в папку расширений Adobe).
+# 2. Запустить бэкенд
+bash scripts/run-backend.sh            # Windows: scripts\run-backend.bat
+```
+Затем в Premiere: **Window → Extensions → KZ-SUB**, ключ `dev-key`, «Тест» →
+выбрать `.epr` пресет → «Субтитр жасау».
+
+Ручная установка и детали — [`plugin/README.md`](plugin/README.md),
+[`backend/README.md`](backend/README.md).
 
 ## Статус
 
