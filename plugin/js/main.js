@@ -227,11 +227,18 @@
         return evalScript('kzsubImportSrt("' + esc(srtPath) + '")').then(function (res) {
           try { fs.unlinkSync(r.wavPath); } catch (e) {}
           if (res && res.indexOf("ERROR:") === 0) { throw new Error(res); }
-          return true;
+          return res;
         });
       })
-      .then(function () {
-        setStatus("Дайын! Субтитр ассеті жобаға импортталды — оны таймлайнға сүйреңіз.", "ok");
+      .then(function (res) {
+        if (res === "INSERTED") {
+          setStatus("Дайын! Субтитрлер таймлайнға қосылды (жоғарғы жаңа видео-жолаққа). " +
+                    "Болдырмау — Cmd+Z.", "ok");
+        } else {
+          // "BIN: ..." — импортировано в корзину, вставить не удалось.
+          var why = String(res).replace(/^BIN:\s*/, "");
+          setStatus("Субтитр ассеті жобаға импортталды — оны таймлайнға сүйреңіз. (" + why + ")", "ok");
+        }
       })
       .catch(function (err) {
         var msg = (err && err.message) ? err.message : String(err);
