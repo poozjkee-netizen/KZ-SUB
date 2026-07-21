@@ -30,6 +30,11 @@ secrets/
 plugin/*.zxp
 plugin/node_modules/
 
+# Сборка/подпись ZXP (сертификат и артефакты не коммитим)
+dist/
+*.zxp
+*.p12
+
 # ОС/редакторы
 .DS_Store
 Thumbs.db
