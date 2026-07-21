@@ -35,23 +35,25 @@
     settingsToggle: document.getElementById("settingsToggle"),
     settingsPanel: document.getElementById("settingsPanel"),
     runLabel: document.getElementById("runLabel"),
+    runContent: document.getElementById("runContent"),
     quote: document.getElementById("quote"),
   };
 
-  // --- Надпись кнопки: каз ⇄ рус, смена раз в секунду через затухание ---
+  // --- Надпись кнопки: каз ⇄ рус, смена раз в 5 секунд через затухание.
+  //     Затухает весь контент кнопки (иконка вместе с текстом). ---
   var RUN_LABELS = ["Субтитр жасау", "Создаём субтитры"];
   var runLabelIdx = 0;
 
   setInterval(function () {
     // Пока кнопка скрыта (идёт обработка) — не крутим.
     if (els.run.classList.contains("hidden")) { return; }
-    els.runLabel.classList.add("faded");
+    els.runContent.classList.add("faded");
     setTimeout(function () {
       runLabelIdx = (runLabelIdx + 1) % RUN_LABELS.length;
       els.runLabel.textContent = RUN_LABELS[runLabelIdx];
-      els.runLabel.classList.remove("faded");
+      els.runContent.classList.remove("faded");
     }, 320); // ждём конца затухания
-  }, 1000);
+  }, 5000);
 
   // --- Цитаты на время обработки: рус и каз по очереди, по кругу ---
   var QUOTES = [

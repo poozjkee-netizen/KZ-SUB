@@ -298,6 +298,9 @@ input[readonly] { color: var(--muted); cursor: default; }
 .fade-swap { transition: opacity 320ms ease; opacity: 1; }
 .fade-swap.faded { opacity: 0; }
 
+/* Контент кнопки (иконка + текст затухают вместе) */
+.btn-content { display: inline-flex; align-items: center; gap: 9px; }
+
 /* ---------- Quote (во время обработки) ---------- */
 .quote {
   position: fixed;
