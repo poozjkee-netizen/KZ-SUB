@@ -26,7 +26,6 @@
         <span class="brand-name">@np3_player</span>
       </div>
       <div class="top-actions">
-        <span class="lang-chip" title="Тіл (v2: көбірек тілдер)">ҚАЗ</span>
         <button id="settingsToggle" class="icon-btn" title="Баптаулар" aria-label="Баптаулар">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"/>
@@ -36,26 +35,25 @@
       </div>
     </header>
 
-    <!-- Настройки (спрятаны за шестерёнкой) -->
+    <!-- Настройки (за шестерёнкой): только язык -->
     <section id="settingsPanel" class="settings hidden">
       <label class="field">
-        <span class="field-label">Сервер</span>
-        <div class="row">
-          <input id="apiUrl" type="text" value="http://localhost:8000" spellcheck="false" />
-          <button id="test" class="btn-ghost">Тест</button>
-        </div>
+        <span class="field-label">Тіл / Язык</span>
+        <select id="langSelect">
+          <option value="kk" selected>Қазақша</option>
+        </select>
+        <span class="field-hint">Жақын арада — басқа тілдер · Скоро — другие языки</span>
       </label>
-      <label class="field">
-        <span class="field-label">Кілт</span>
-        <input id="apiKey" type="password" spellcheck="false" />
-      </label>
-      <label class="field">
-        <span class="field-label">Аудио-пресет</span>
-        <div class="row">
-          <input id="presetPath" type="text" placeholder="Таңдалмаған" readonly />
-          <button id="pickPreset" class="btn-ghost">Таңдау</button>
-        </div>
-      </label>
+
+      <!-- Технические параметры скрыты: работают на значениях по умолчанию
+           (сервер/ключ/пресет). При хостинге сюда зашивается прод-адрес. -->
+      <div class="tech-hidden" hidden>
+        <input id="apiUrl" type="text" value="http://localhost:8000" />
+        <button id="test" tabindex="-1"></button>
+        <input id="apiKey" type="password" />
+        <input id="presetPath" type="text" readonly />
+        <button id="pickPreset" tabindex="-1"></button>
+      </div>
     </section>
 
     <!-- Центр: кнопка / лоадер -->

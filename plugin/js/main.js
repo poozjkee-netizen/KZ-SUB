@@ -214,7 +214,7 @@
           if (res.statusCode >= 200 && res.statusCode < 300) {
             resolve(text);
           } else if (res.statusCode === 401) {
-            reject(new Error("Қате кілт. Баптауларды тексеріңіз (⚙)."));
+            reject(new Error("Кілт қатесі. Қолдау қызметіне жазыңыз."));
           } else if (res.statusCode === 402) {
             reject(new Error("Лимит таусылды. Жазылымды жаңартыңыз."));
           } else if (res.statusCode === 413) {
@@ -226,7 +226,7 @@
       });
       req.setTimeout(UPLOAD_TIMEOUT_MS, function () { req.destroy(new Error("Сервер жауап бермеді.")); });
       req.on("error", function (e) {
-        reject(new Error("Байланыс жоқ. Баптауларды тексеріңіз (⚙)."));
+        reject(new Error("Байланыс жоқ. Кейінірек қайталап көріңіз."));
       });
       req.write(body);
       req.end();
@@ -275,8 +275,7 @@
     var apiKey = els.apiKey.value.trim();
 
     if (!apiUrl || !apiKey) {
-      els.settingsPanel.classList.remove("hidden");
-      return setStatus("Баптауларды толтырыңыз (⚙).", "error");
+      return setStatus("Қате конфигурация. Панельді қайта ашыңыз.", "error");
     }
     saveSettings();
     setBusy(true);
