@@ -54,7 +54,8 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_CAPTION_STYLE`         | `word`       | `word` (караоке, по слову) / `phrase` (фразы) |
 | `KZSUB_GLUE_MAX_CHARS`        | `2`          | в режиме `word`: короткие слова липнут к следующему |
 | `KZSUB_UPPERCASE`             | `false`      | ВЕРХНИЙ регистр субтитров            |
-| `KZSUB_STRIP_PUNCTUATION`     | `false`      | убирать пунктуацию (караоке-стиль)   |
+| `KZSUB_STRIP_PUNCTUATION`     | `true`       | убирать пунктуацию (караоке-стиль)   |
+| `KZSUB_PUNCT_KEEP`            | `!`          | какие знаки оставить при очистке     |
 | `KZSUB_MAX_LINE_CHARS`        | `42`         | (режим `phrase`) макс. символов в строке |
 | `KZSUB_MAX_LINES`             | `2`          | макс. строк в реплике               |
 | `KZSUB_MAX_CUE_SECONDS`       | `7.0`        | макс. длительность реплики          |

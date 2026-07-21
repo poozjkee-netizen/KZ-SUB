@@ -77,6 +77,7 @@ def handler(job: dict) -> dict:
             segments,
             uppercase=settings.uppercase,
             strip_punctuation=settings.strip_punctuation,
+            punct_keep=settings.punct_keep,
         )
 
         commit(api_key, duration or estimated_seconds)

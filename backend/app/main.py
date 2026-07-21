@@ -88,6 +88,7 @@ async def transcribe(
             segments,
             uppercase=settings.uppercase,
             strip_punctuation=settings.strip_punctuation,
+            punct_keep=settings.punct_keep,
         )
 
         commit(x_api_key, duration or estimated_seconds)

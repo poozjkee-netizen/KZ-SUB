@@ -83,8 +83,13 @@ class Settings:
     # ВЕРХНИЙ РЕГИСТР всего текста (типично для караоке-субтитров Shorts/Reels).
     uppercase: bool = _get_bool("UPPERCASE", False)
 
-    # Убирать пунктуацию (точки, запятые и т.п.) — тоже частый караоке-стиль.
-    strip_punctuation: bool = _get_bool("STRIP_PUNCTUATION", False)
+    # Убирать пунктуацию (точки, запятые и т.п.) — караоке-стиль. Включено по
+    # умолчанию по пожеланию продукта: субтитры чище.
+    strip_punctuation: bool = _get_bool("STRIP_PUNCTUATION", True)
+
+    # Символы пунктуации, которые НЕ удаляются (по умолчанию — "!":
+    # восклицательные знаки остаются).
+    punct_keep: str = _get("PUNCT_KEEP", "!")
 
 
 settings = Settings()

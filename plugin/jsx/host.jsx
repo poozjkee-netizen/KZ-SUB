@@ -116,31 +116,25 @@ function kzsubImportSrt(srtPath) {
             return "BIN: нет активной секвенции.";
         }
 
-        // Добавляем новую видеодорожку сверху (QE DOM), не трогая существующие.
-        var tracksBefore = seq.videoTracks.numTracks;
-        try {
-            app.enableQE();
-            var qeSeq = qe.project.getActiveSequence();
-            // addTracks(numV, videoPos, numA, audioPos, numSubmix, submixPos)
-            qeSeq.addTracks(1, qeSeq.numVideoTracks, 0, 0, 0, 0);
-        } catch (eqe) {
-            // QE недоступен/сигнатура иная — не рискуем существующими дорожками.
+        // .srt в Premiere — caption-ассет: на обычную видеодорожку через
+        // insertClip он НЕ вставляется. Правильный путь — createCaptionTrack
+        // (Premiere 15.4+): создаёт дорожку субтитров и кладёт туда captions.
+        if (typeof seq.createCaptionTrack === "function") {
+            try {
+                // (ассет, время начала в секундах)
+                var okCap = seq.createCaptionTrack(item, 0);
+                if (okCap) {
+                    return "INSERTED";
+                }
+                return "BIN: createCaptionTrack вернул false — перетащите ассет вручную.";
+            } catch (ecap) {
+                return "BIN: createCaptionTrack: " + ecap.toString() +
+                       " — перетащите ассет вручную.";
+            }
         }
 
-        var seq2 = app.project.activeSequence;
-        if (seq2.videoTracks.numTracks <= tracksBefore) {
-            return "BIN: не удалось добавить дорожку — перетащите ассет вручную.";
-        }
-
-        var topTrack = seq2.videoTracks[seq2.videoTracks.numTracks - 1];
-        try {
-            // Вставка в начало пустой новой дорожки (время 0). Недеструктивно.
-            topTrack.insertClip(item, 0);
-            return "INSERTED";
-        } catch (eins) {
-            return "BIN: не удалось вставить на дорожку (" + eins.toString() +
-                   ") — перетащите ассет вручную.";
-        }
+        return "BIN: ваша версия Premiere не поддерживает createCaptionTrack " +
+               "(нужен 2021.4+/15.4+) — перетащите ассет вручную.";
     } catch (e) {
         return "ERROR: " + e.toString();
     }

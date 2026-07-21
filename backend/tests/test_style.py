@@ -26,6 +26,12 @@ def test_strip_punctuation():
     assert out[0].text == "Сәлем әлем"
 
 
+def test_strip_keeps_exclamation():
+    segs = [Segment(0, 1, "Сәлем, әлем! Қалайсың?")]
+    out = apply_style(segs, uppercase=False, strip_punctuation=True, punct_keep="!")
+    assert out[0].text == "Сәлем әлем! Қалайсың"
+
+
 def test_keeps_hyphen_and_apostrophe():
     segs = [Segment(0, 1, "тайм-код, o'zbek.")]
     out = apply_style(segs, uppercase=False, strip_punctuation=True)
