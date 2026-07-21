@@ -13,8 +13,9 @@ Premiere Pro
         ▼
 KZ-SUB API (FastAPI)
         │  3. quota.py: проверка ключа/лимита
-        │  4. transcribe.py: faster-whisper (kk) → сегменты
-        │  5. srt.py: сегменты → .srt
+        │  4. transcribe.py: faster-whisper (kk) → сегменты + пословные тайм-коды
+        │  5. segmentation.py: нарезка в аккуратные реплики (длина/время/паузы)
+        │  6. srt.py: сегменты → .srt
         ▼
 Premiere Pro
         │  6. main.js: пишет .srt во временный файл

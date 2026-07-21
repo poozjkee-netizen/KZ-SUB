@@ -50,12 +50,17 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_COMPUTE_TYPE`          | `int8`       | тип вычислений                      |
 | `KZSUB_FREE_MINUTES_PER_MONTH`| `30`         | бесплатный лимит                    |
 | `KZSUB_MAX_AUDIO_SECONDS`     | `5400`       | лимит длительности файла            |
+| `KZSUB_MAX_LINE_CHARS`        | `42`         | макс. символов в строке субтитра    |
+| `KZSUB_MAX_LINES`             | `2`          | макс. строк в реплике               |
+| `KZSUB_MAX_CUE_SECONDS`       | `7.0`        | макс. длительность реплики          |
+| `KZSUB_MAX_GAP_SECONDS`       | `0.8`        | пауза для разрыва реплики           |
 
 ## Тесты
 ```bash
 # Без тяжёлых зависимостей (чистая логика):
 python tests/test_srt.py
 python tests/test_quota.py
+python tests/test_segmentation.py
 
 # Интеграционный тест HTTP-контракта /transcribe (нужен fastapi/httpx,
 # модель Whisper замокана — GPU/веса не требуются):

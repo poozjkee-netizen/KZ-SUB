@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import logging
 
+from .asr_types import RawSegment, Word
 from .config import settings
-from .srt import Segment
 
 logger = logging.getLogger("kzsub.transcribe")
 
@@ -19,7 +19,7 @@ def _get_model():
     global _model
     if _model is None:
         # Импорт внутри функции — чтобы приложение поднималось даже без
-        # установленной тяжёлой зависимости (например, в тестах SRT-логики).
+        # установленной тяжёлой зависимости (например, в тестах логики).
         from faster_whisper import WhisperModel
 
         logger.info(
@@ -34,12 +34,15 @@ def _get_model():
     return _model
 
 
-def transcribe_file(path: str) -> tuple[list[Segment], float]:
+def transcribe_file(path: str) -> tuple[list[RawSegment], float]:
     """Транскрибирует аудиофайл на казахском.
 
-    Возвращает (список сегментов, длительность аудио в секундах).
+    Возвращает (список RawSegment с пословными тайм-кодами, длительность аудио).
     Язык жёстко зафиксирован (settings.language = 'kk'): продукт про казахский,
     авто-детект языка тут только вредит (Whisper часто путает kk с ru/tt/ky).
+
+    word_timestamps=True нужен, чтобы аккуратно резать длинные реплики по
+    границам слов (см. segmentation.py).
     """
     model = _get_model()
 
@@ -51,12 +54,19 @@ def transcribe_file(path: str) -> tuple[list[Segment], float]:
         vad_parameters={"min_silence_duration_ms": 400},
         beam_size=5,
         condition_on_previous_text=True,
+        word_timestamps=True,
     )
 
-    segments = [
-        Segment(start=s.start, end=s.end, text=s.text)
-        for s in segments_iter
-    ]
+    raw: list[RawSegment] = []
+    for s in segments_iter:
+        words: list[Word] = []
+        for w in (getattr(s, "words", None) or []):
+            # У faster-whisper слово лежит в .word (с ведущим пробелом).
+            wt = (getattr(w, "word", "") or "").strip()
+            if wt:
+                words.append(Word(start=w.start, end=w.end, text=wt))
+        raw.append(RawSegment(start=s.start, end=s.end, text=s.text, words=words))
+
     duration = float(getattr(info, "duration", 0.0) or 0.0)
-    logger.info("Готово: %d сегментов, %.1f сек аудио", len(segments), duration)
-    return segments, duration
+    logger.info("Готово: %d сегментов, %.1f сек аудио", len(raw), duration)
+    return raw, duration

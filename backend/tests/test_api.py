@@ -18,7 +18,7 @@ pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app import main, quota  # noqa: E402
-from app.srt import Segment  # noqa: E402
+from app.asr_types import RawSegment, Word  # noqa: E402
 
 
 @pytest.fixture
@@ -26,9 +26,18 @@ def client(monkeypatch):
     quota._usage.clear()
 
     def fake_transcribe(path):
+        # Пословные тайм-коды; большой разрыв (2.5 - 1.2 = 1.3с) между репликами
+        # заставит нарезку оставить их отдельными субтитрами.
         return (
-            [Segment(0.0, 1.2, "Сәлеметсіз бе"), Segment(1.2, 2.5, "Қалыңыз қалай")],
-            2.5,
+            [
+                RawSegment(0.0, 1.2, "Сәлеметсіз бе", [
+                    Word(0.0, 0.6, "Сәлеметсіз"), Word(0.6, 1.2, "бе"),
+                ]),
+                RawSegment(2.5, 3.5, "Қалыңыз қалай", [
+                    Word(2.5, 3.0, "Қалыңыз"), Word(3.0, 3.5, "қалай"),
+                ]),
+            ],
+            3.5,
         )
 
     # Подменяем тяжёлую транскрибацию заглушкой.
@@ -68,6 +77,7 @@ def test_transcribe_json_format(client):
     assert data["language"] == "kk"
     assert len(data["segments"]) == 2
     assert data["segments"][0]["text"] == "Сәлеметсіз бе"
+    assert data["segments"][1]["text"] == "Қалыңыз қалай"
 
 
 def test_invalid_key_rejected(client):

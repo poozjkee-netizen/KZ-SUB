@@ -44,5 +44,18 @@ class Settings:
     # Директория для временных файлов.
     tmp_dir: str = _get("TMP_DIR", "tmp")
 
+    # --- Параметры нарезки субтитров (читаемость) ---
+    # Максимум символов в одной строке субтитра (норма для читаемости ~42).
+    max_line_chars: int = _get_int("MAX_LINE_CHARS", 42)
+
+    # Максимум строк в одной реплике субтитра.
+    max_lines: int = _get_int("MAX_LINES", 2)
+
+    # Максимальная длительность одной реплики (сек).
+    max_cue_seconds: float = float(_get("MAX_CUE_SECONDS", "7.0"))
+
+    # Пауза между словами, по которой принудительно разрываем реплику (сек).
+    max_gap_seconds: float = float(_get("MAX_GAP_SECONDS", "0.8"))
+
 
 settings = Settings()
