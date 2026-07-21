@@ -20,6 +20,13 @@ def _get_int(name: str, default: int) -> int:
         return default
 
 
+def _get_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(f"KZSUB_{name}")
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on", "да")
+
+
 class Settings:
     # Модель Whisper. Для казахского минимально пригоден "large-v3".
     # Меньшие модели ("medium", "small") заметно хуже на казахском — использовать
@@ -66,6 +73,13 @@ class Settings:
     # В режиме "word": слова не длиннее этого числа символов считаются
     # «служебными» и прилипают к следующему слову (в дополнение к списку предлогов).
     glue_max_chars: int = _get_int("GLUE_MAX_CHARS", 2)
+
+    # --- Оформление (стиль вывода) ---
+    # ВЕРХНИЙ РЕГИСТР всего текста (типично для караоке-субтитров Shorts/Reels).
+    uppercase: bool = _get_bool("UPPERCASE", False)
+
+    # Убирать пунктуацию (точки, запятые и т.п.) — тоже частый караоке-стиль.
+    strip_punctuation: bool = _get_bool("STRIP_PUNCTUATION", False)
 
 
 settings = Settings()

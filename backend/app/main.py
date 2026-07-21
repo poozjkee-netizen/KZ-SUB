@@ -17,6 +17,7 @@ from .config import settings
 from .quota import QuotaError, check_and_reserve, commit
 from .segmentation import resegment, resegment_words
 from .srt import segments_to_srt
+from .style import apply_style
 from .transcribe import transcribe_file
 
 logging.basicConfig(level=logging.INFO)
@@ -81,6 +82,13 @@ async def transcribe(
                 max_cue_seconds=settings.max_cue_seconds,
                 max_gap_seconds=settings.max_gap_seconds,
             )
+
+        # Оформление: регистр / пунктуация.
+        segments = apply_style(
+            segments,
+            uppercase=settings.uppercase,
+            strip_punctuation=settings.strip_punctuation,
+        )
 
         commit(x_api_key, duration or estimated_seconds)
 
