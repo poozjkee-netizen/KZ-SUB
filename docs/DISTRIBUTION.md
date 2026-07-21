@@ -45,6 +45,9 @@ ZXPSIGNCMD=~/bin/ZXPSignCmd bash scripts/build-zxp.sh
 
 **Что нужно:** файл `KZ-SUB.zxp` и ключ активации (выдаёшь ты).
 
+> Один и тот же `.zxp` ставится и на **macOS**, и на **Windows** — файл
+> кроссплатформенный, переподписывать под Windows не нужно.
+
 ### Установка (macOS/Windows)
 1. Скачать бесплатный установщик расширений:
    **ZXP/UXP Installer** (aescripts) или **Anastasiy's Extension Manager**.
