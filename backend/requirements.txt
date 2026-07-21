@@ -1,4 +1,10 @@
-fastapi==0.111.0
-uvicorn[standard]==0.30.1
-python-multipart==0.0.9
-faster-whisper==1.0.3
+# Нижние границы, а не жёсткие пины: чтобы pip брал готовые wheel'ы под вашу
+# версию Python (важно для свежих Python 3.12/3.13 и Apple Silicon, где старые
+# версии PyAV/av собираются из исходников и падают на clang).
+fastapi>=0.111
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+
+# faster-whisper>=1.1 зависит от av>=11 без верхнего потолка -> pip подтянет
+# свежий av, у которого есть arm64-wheel'ы под новые Python.
+faster-whisper>=1.1.0
