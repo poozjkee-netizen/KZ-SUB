@@ -35,7 +35,7 @@
       </div>
     </header>
 
-    <!-- Настройки (за шестерёнкой): только язык -->
+    <!-- Настройки (за шестерёнкой): язык + ключ активации -->
     <section id="settingsPanel" class="settings hidden">
       <label class="field">
         <span class="field-label">Тіл / Язык</span>
@@ -45,12 +45,17 @@
         <span class="field-hint">Жақын арада — басқа тілдер · Скоро — другие языки</span>
       </label>
 
-      <!-- Технические параметры скрыты: работают на значениях по умолчанию
-           (сервер/ключ/пресет). При хостинге сюда зашивается прод-адрес. -->
+      <label class="field">
+        <span class="field-label">Кілт / Ключ активации</span>
+        <div class="row">
+          <input id="apiKey" type="password" placeholder="Кілтіңізді енгізіңіз" spellcheck="false" />
+          <button id="test" class="btn-ghost">Тексеру</button>
+        </div>
+      </label>
+
+      <!-- Технические параметры скрыты: прод-адрес зашит, пресет — из панели/по умолчанию. -->
       <div class="tech-hidden" hidden>
-        <input id="apiUrl" type="text" value="http://localhost:8000" />
-        <button id="test" tabindex="-1"></button>
-        <input id="apiKey" type="password" />
+        <input id="apiUrl" type="text" value="https://kzsub-gateway.fly.dev" />
         <input id="presetPath" type="text" readonly />
         <button id="pickPreset" tabindex="-1"></button>
       </div>

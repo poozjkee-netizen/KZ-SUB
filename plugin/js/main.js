@@ -93,14 +93,20 @@
     els.quote.textContent = "";
   }
 
-  // --- Восстановление настроек (дефолты: localhost + dev-key) ---
+  // --- Восстановление настроек ---
+  // Адрес сервера зашит в HTML (прод-шлюз). Сохранённый в прежних версиях
+  // localhost игнорируем — иначе панель после обновления ходила бы на
+  // несуществующий локальный сервер.
   try {
-    els.apiUrl.value = localStorage.getItem("kzsub.apiUrl") || els.apiUrl.value;
-    els.apiKey.value = localStorage.getItem("kzsub.apiKey") || "dev-key";
+    var storedUrl = localStorage.getItem("kzsub.apiUrl") || "";
+    if (storedUrl &&
+        storedUrl.indexOf("http://localhost") !== 0 &&
+        storedUrl.indexOf("http://127.0.0.1") !== 0) {
+      els.apiUrl.value = storedUrl;
+    }
+    els.apiKey.value = localStorage.getItem("kzsub.apiKey") || "";
     els.presetPath.value = localStorage.getItem("kzsub.presetPath") || "";
-  } catch (e) {
-    els.apiKey.value = els.apiKey.value || "dev-key";
-  }
+  } catch (e) {}
 
   function saveSettings() {
     try {
@@ -274,7 +280,11 @@
     var apiUrl = els.apiUrl.value.trim();
     var apiKey = els.apiKey.value.trim();
 
-    if (!apiUrl || !apiKey) {
+    if (!apiKey) {
+      els.settingsPanel.classList.remove("hidden");
+      return setStatus("Кілтіңізді енгізіңіз (⚙ баптаулар).", "error");
+    }
+    if (!apiUrl) {
       return setStatus("Қате конфигурация. Панельді қайта ашыңыз.", "error");
     }
     saveSettings();
@@ -320,4 +330,5 @@
   els.test.addEventListener("click", onTest);
   els.pickPreset.addEventListener("click", onPickPreset);
   els.settingsToggle.addEventListener("click", toggleSettings);
+  els.apiKey.addEventListener("change", saveSettings); // ключ сохраняется сразу
 })();
