@@ -34,7 +34,62 @@
     loader: document.getElementById("loader"),
     settingsToggle: document.getElementById("settingsToggle"),
     settingsPanel: document.getElementById("settingsPanel"),
+    runLabel: document.getElementById("runLabel"),
+    quote: document.getElementById("quote"),
   };
+
+  // --- Надпись кнопки: каз ⇄ рус, смена раз в секунду через затухание ---
+  var RUN_LABELS = ["Субтитр жасау", "Создаём субтитры"];
+  var runLabelIdx = 0;
+
+  setInterval(function () {
+    // Пока кнопка скрыта (идёт обработка) — не крутим.
+    if (els.run.classList.contains("hidden")) { return; }
+    els.runLabel.classList.add("faded");
+    setTimeout(function () {
+      runLabelIdx = (runLabelIdx + 1) % RUN_LABELS.length;
+      els.runLabel.textContent = RUN_LABELS[runLabelIdx];
+      els.runLabel.classList.remove("faded");
+    }, 320); // ждём конца затухания
+  }, 1000);
+
+  // --- Цитаты на время обработки: рус и каз по очереди, по кругу ---
+  var QUOTES = [
+    "Искусство правит миром",
+    "Өнер — өмірдің тынысы",            // Искусство — дыхание жизни
+    "Красота — в мелочах",
+    "Әр кадр — бір әлем",               // Каждый кадр — целый мир
+    "Творчество — это смелость",
+    "Шабыт жүректен шығады",            // Вдохновение идёт от сердца
+    "Каждый кадр имеет значение",
+    "Сөз — күміс, субтитр — алтын",     // Слово — серебро, субтитр — золото
+    "Великое начинается с малого",
+    "Ұлы іс кішіден басталады",         // Великое начинается с малого
+  ];
+  var quoteIdx = -1;
+  var quoteTimer = null;
+
+  function nextQuote() {
+    els.quote.classList.add("faded");
+    setTimeout(function () {
+      quoteIdx = (quoteIdx + 1) % QUOTES.length;
+      els.quote.textContent = QUOTES[quoteIdx];
+      els.quote.classList.remove("faded");
+    }, 320);
+  }
+
+  function startQuotes() {
+    quoteIdx = -1;
+    els.quote.classList.remove("hidden");
+    nextQuote();
+    quoteTimer = setInterval(nextQuote, 3000);
+  }
+
+  function stopQuotes() {
+    if (quoteTimer) { clearInterval(quoteTimer); quoteTimer = null; }
+    els.quote.classList.add("hidden");
+    els.quote.textContent = "";
+  }
 
   // --- Восстановление настроек (дефолты: localhost + dev-key) ---
   try {
@@ -58,12 +113,17 @@
     els.status.className = "status" + (kind ? " " + kind : "");
   }
 
-  // Занято: прячем кнопку, показываем неоновый спиннер.
+  // Занято: прячем кнопку, показываем неоновый спиннер и цитаты.
   function setBusy(busy) {
     els.run.disabled = busy;
     els.run.classList.toggle("hidden", busy);
     els.loader.classList.toggle("hidden", !busy);
-    if (busy) { setStatus(""); }
+    if (busy) {
+      setStatus("");
+      startQuotes();
+    } else {
+      stopQuotes();
+    }
   }
 
   function toggleSettings() {
