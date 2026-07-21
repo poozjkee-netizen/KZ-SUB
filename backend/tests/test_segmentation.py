@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.asr_types import RawSegment, Word  # noqa: E402
-from app.segmentation import _wrap, resegment  # noqa: E402
+from app.segmentation import _wrap, resegment, resegment_words  # noqa: E402
 
 
 def _words(pairs, step=0.4, start=0.0):
@@ -66,6 +66,43 @@ def test_fallback_without_words():
     assert len(cues) == 1
     assert cues[0].start == 0.0 and cues[0].end == 2.0
     assert "мәтін" in cues[0].text
+
+
+def test_words_one_per_cue():
+    words = _words(["алма", "жеді", "бала"])
+    raw = [RawSegment(words[0].start, words[-1].end, "x", words)]
+    cues = resegment_words(raw, glue_max_chars=2)
+    assert [c.text for c in cues] == ["алма", "жеді", "бала"]
+
+
+def test_words_preposition_glues_to_next():
+    words = _words(["ол", "в", "доме", "жатыр"])
+    raw = [RawSegment(words[0].start, words[-1].end, "x", words)]
+    cues = resegment_words(raw, glue_max_chars=2)
+    # "в" — предлог, прилипает к "доме"; "ол"(2 симв.) тоже служебное -> к "в доме"
+    assert [c.text for c in cues] == ["ол в доме", "жатыр"]
+
+
+def test_words_short_by_length_glues():
+    words = _words(["де", "келді"])  # "де" — 2 символа, служебное
+    raw = [RawSegment(words[0].start, words[-1].end, "x", words)]
+    cues = resegment_words(raw, glue_max_chars=2)
+    assert [c.text for c in cues] == ["де келді"]
+
+
+def test_words_trailing_short_attaches_to_prev():
+    words = _words(["үйде", "жоқ", "ма"])  # "ма" в конце -> к предыдущей реплике
+    raw = [RawSegment(words[0].start, words[-1].end, "x", words)]
+    cues = resegment_words(raw, glue_max_chars=2)
+    assert [c.text for c in cues] == ["үйде", "жоқ ма"]
+
+
+def test_words_timestamps_span_group():
+    words = _words(["на", "столе"], step=0.5, start=1.0)  # 1.0-1.5, 1.5-2.0
+    raw = [RawSegment(1.0, 2.0, "x", words)]
+    cues = resegment_words(raw, glue_max_chars=2)
+    assert len(cues) == 1
+    assert cues[0].start == 1.0 and cues[0].end == 2.0
 
 
 if __name__ == "__main__":

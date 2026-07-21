@@ -13,6 +13,70 @@ from .asr_types import RawSegment, Word
 from .srt import Segment
 
 
+# Короткие служебные слова, которые логично держать вместе со следующим словом.
+# В основном русские предлоги (казахский агглютинативен, там частицы обычно
+# постпозитивны и покрываются правилом по длине glue_max_chars).
+GLUE_WORDS = {
+    # русские предлоги
+    "в", "во", "на", "за", "к", "ко", "с", "со", "у", "о", "об", "обо",
+    "от", "ото", "до", "из", "изо", "по", "под", "подо", "над", "надо",
+    "при", "про", "без", "для", "не", "ни",
+    # казахские короткие частицы/союзы, встречающиеся в потоке
+    "әрі", "әр", "бір",
+}
+
+
+def _clean(text: str) -> str:
+    """Слово без пунктуации по краям — для проверки «служебности»."""
+    return text.strip().strip(".,!?;:—-«»\"'()").lower()
+
+
+def _is_glue(text: str, glue_max_chars: int) -> bool:
+    w = _clean(text)
+    if not w:
+        return True
+    return len(w) <= glue_max_chars or w in GLUE_WORDS
+
+
+def resegment_words(raw: list[RawSegment], glue_max_chars: int) -> list[Segment]:
+    """Караоке-режим: одно слово на реплику.
+
+    Короткие предлоги/частицы (см. _is_glue) прилипают к СЛЕДУЮЩЕМУ слову.
+    Хвостовые служебные слова без следующего — прилипают к предыдущей реплике.
+    """
+    words = _flatten_words(raw)
+
+    cues: list[Segment] = []
+    pending: list[Word] = []  # накопленные служебные слова, ждут «настоящее» слово
+
+    for w in words:
+        if not w.text.strip():
+            continue
+        if _is_glue(w.text, glue_max_chars):
+            pending.append(w)
+            continue
+        group = pending + [w]
+        pending = []
+        cues.append(
+            Segment(
+                start=group[0].start,
+                end=group[-1].end,
+                text=" ".join(x.text.strip() for x in group).strip(),
+            )
+        )
+
+    # Остались только служебные слова (например, в самом конце) — приклеим к
+    # предыдущей реплике, либо, если её нет, выпустим как есть.
+    if pending:
+        tail = " ".join(x.text.strip() for x in pending).strip()
+        if cues:
+            cues[-1] = Segment(cues[-1].start, pending[-1].end, cues[-1].text + " " + tail)
+        elif tail:
+            cues.append(Segment(pending[0].start, pending[-1].end, tail))
+
+    return cues
+
+
 def _flatten_words(raw: list[RawSegment]) -> list[Word]:
     """Собирает все слова из сегментов. Если пословных тайм-кодов нет —
     использует сегмент целиком как один «блок» (деградация без падения)."""

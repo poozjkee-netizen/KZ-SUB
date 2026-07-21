@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 
 from .config import settings
 from .quota import QuotaError, check_and_reserve, commit
-from .segmentation import resegment
+from .segmentation import resegment, resegment_words
 from .srt import segments_to_srt
 from .transcribe import transcribe_file
 
@@ -68,14 +68,19 @@ async def transcribe(
             logger.exception("Ошибка транскрибации")
             raise HTTPException(status_code=500, detail="Ошибка транскрибации")
 
-        # Режем длинные реплики Whisper в аккуратные читаемые субтитры.
-        segments = resegment(
-            raw_segments,
-            max_line_chars=settings.max_line_chars,
-            max_lines=settings.max_lines,
-            max_cue_seconds=settings.max_cue_seconds,
-            max_gap_seconds=settings.max_gap_seconds,
-        )
+        # Нарезаем субтитры в выбранном стиле.
+        if settings.caption_style == "word":
+            # Караоке-стиль: одно слово на реплику (предлоги липнут к слову).
+            segments = resegment_words(raw_segments, glue_max_chars=settings.glue_max_chars)
+        else:
+            # Аккуратные реплики-фразы.
+            segments = resegment(
+                raw_segments,
+                max_line_chars=settings.max_line_chars,
+                max_lines=settings.max_lines,
+                max_cue_seconds=settings.max_cue_seconds,
+                max_gap_seconds=settings.max_gap_seconds,
+            )
 
         commit(x_api_key, duration or estimated_seconds)
 
