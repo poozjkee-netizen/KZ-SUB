@@ -21,7 +21,10 @@ for v in 9 10 11 12 13; do
   defaults write "com.adobe.CSXS.$v" PlayerDebugMode 1 2>/dev/null || true
 done
 
-echo "==> Линкую панель в $EXT_DIR…"
+# Примечание: не ставим не-ASCII символы вплотную после $VAR — штатный bash 3.2
+# на macOS ломается на этом ("unbound variable"). Держим переменные в конце строки.
+echo "==> Линкую панель:"
+echo "    $EXT_DIR"
 mkdir -p "$EXT_DIR"
 rm -rf "$LINK"
 ln -s "$PLUGIN_DIR" "$LINK"
