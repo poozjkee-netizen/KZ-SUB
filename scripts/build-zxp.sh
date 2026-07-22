@@ -20,7 +20,7 @@ DIST="$ROOT/dist"
 SIGN="${ZXPSIGNCMD:-ZXPSignCmd}"
 CERT="$DIST/kzsub-cert.p12"
 CERT_PASS="${KZSUB_CERT_PASS:-kzsub2026}"
-ZXP="$DIST/KZ-SUB.zxp"
+ZXP="$DIST/NP-SUB.zxp"
 
 # Данные для самоподписанного сертификата (можно переопределить переменными).
 CERT_COUNTRY="${KZSUB_CERT_COUNTRY:-KZ}"

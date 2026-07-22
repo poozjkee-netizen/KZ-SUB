@@ -6,7 +6,7 @@
 -->
 <ExtensionManifest Version="9.0" ExtensionBundleId="kz.kzsub.panel"
     ExtensionBundleVersion="1.0.0"
-    ExtensionBundleName="KZ-SUB"
+    ExtensionBundleName="NP SUB"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
     <Extension Id="kz.kzsub.panel.main" Version="1.0.0" />
@@ -38,7 +38,7 @@
         </Lifecycle>
         <UI>
           <Type>Panel</Type>
-          <Menu>KZ-SUB — қазақша субтитр</Menu>
+          <Menu>NP SUB</Menu>
           <Geometry>
             <Size>
               <Height>420</Height>
@@ -49,6 +49,12 @@
               <Width>280</Width>
             </MinSize>
           </Geometry>
+          <Icons>
+            <Icon Type="Normal">./icons/icon.png</Icon>
+            <Icon Type="RollOver">./icons/icon.png</Icon>
+            <Icon Type="DarkNormal">./icons/icon.png</Icon>
+            <Icon Type="DarkRollOver">./icons/icon.png</Icon>
+          </Icons>
         </UI>
       </DispatchInfo>
     </Extension>
