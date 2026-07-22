@@ -28,7 +28,7 @@ from app.quota import QuotaError, check_and_reserve, commit  # noqa: E402
 from app.segmentation import resegment, resegment_words  # noqa: E402
 from app.srt import segments_to_srt  # noqa: E402
 from app.style import apply_style  # noqa: E402
-from app.transcribe import transcribe_file  # noqa: E402
+from app.transcribe import _get_model, transcribe_file  # noqa: E402
 
 
 def handler(job: dict) -> dict:
@@ -103,5 +103,12 @@ def handler(job: dict) -> dict:
 
 if __name__ == "__main__":
     import runpod  # доступен в образе Runpod Serverless
+
+    # Прогрев: загружаем/скачиваем модель ДО первого задания. Модель кэшируется
+    # на Network Volume (см. HF_HOME в Dockerfile.runpod), поэтому качается
+    # только на самом первом старте воркера на новом томе; дальше — мгновенно.
+    print("KZ-SUB: прогрев модели…", flush=True)
+    _get_model()
+    print("KZ-SUB: модель готова, слушаю задания.", flush=True)
 
     runpod.serverless.start({"handler": handler})

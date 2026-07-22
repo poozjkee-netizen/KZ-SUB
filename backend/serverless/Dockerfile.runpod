@@ -13,10 +13,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt runpod
 
-# Запекаем веса large-v3 в образ (~3 ГБ): иначе каждый холодный старт воркера
-# качал бы их из интернета минутами. Образ толще, зато старт быстрее и дешевле.
-ENV HF_HOME=/root/.cache/huggingface
-RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download('Systran/faster-whisper-large-v3')"
+# Веса large-v3 НЕ запекаем в образ — образ остаётся лёгким (~2 ГБ вместо
+# ~8 ГБ), пуллится за секунды на новом воркере. Модель (3 ГБ) хранится на
+# подключённом Runpod Network Volume (/runpod-volume) и качается туда ОДИН РАЗ
+# при первом запуске воркера, дальше переиспользуется всеми холодными стартами.
+# См. docs/HOSTING.md -> "Network Volume".
+ENV HF_HOME=/runpod-volume/hf-cache
 
 COPY app ./app
 COPY serverless ./serverless

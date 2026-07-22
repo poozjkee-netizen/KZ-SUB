@@ -165,6 +165,32 @@
     }, 320);
   }
 
+  // Подсказки терпения: если ответ идёт дольше обычного — вероятно, сервер
+  // (GPU) сейчас «просыпается» после простоя. Без этого пользователь решит,
+  // что плагин завис, хотя на деле идёт нормальный холодный старт.
+  var PATIENCE_NOTES = [
+    [20000, bi("Сервер іске қосылуда, күте тұрыңыз…",
+               "Сервер запускается, подождите немного…")],
+    [60000, bi("Бірінші рет сәл ұзағырақ болуы мүмкін…",
+               "В первый раз может занять чуть дольше…")],
+    [150000, bi("Әлі жұмыс істеп жатыр, дәл қазір бас тартпаңыз…",
+                "Всё ещё работает, не отменяйте прямо сейчас…")],
+  ];
+  var patienceTimers = [];
+
+  function startPatienceNotes() {
+    PATIENCE_NOTES.forEach(function (pair) {
+      patienceTimers.push(setTimeout(function () {
+        setStatus(pair[1]);
+      }, pair[0]));
+    });
+  }
+
+  function stopPatienceNotes() {
+    patienceTimers.forEach(clearTimeout);
+    patienceTimers = [];
+  }
+
   // Занято: прячем кнопку, показываем неоновый спиннер и цитаты.
   function setBusy(busy) {
     els.run.disabled = busy;
@@ -173,8 +199,10 @@
     if (busy) {
       setStatus("");
       startQuotes();
+      startPatienceNotes();
     } else {
       stopQuotes();
+      stopPatienceNotes();
     }
   }
 
