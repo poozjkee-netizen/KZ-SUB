@@ -1,8 +1,8 @@
 # Образ для Runpod Serverless (GPU, посекундная оплата, $0 за простой).
 # Сборка ИЗ ПАПКИ backend/:
 #   docker build --platform linux/amd64 -f serverless/Dockerfile.runpod \
-#       -t <dockerhub-user>/kzsub-runpod:v1 .
-#   docker push <dockerhub-user>/kzsub-runpod:v1
+#       -t <dockerhub-user>/kzsub-runpod:v2 .
+#   docker push <dockerhub-user>/kzsub-runpod:v2
 FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
 RUN apt-get update \
@@ -14,14 +14,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt runpod
 
-# Веса large-v3 ЗАПЕКАЕМ в образ. Осознанное решение (см. docs/DECISIONS.md ADR-7):
-# так эндпоинт НЕ привязан к одному дата-центру (в отличие от Network Volume) и
-# может брать GPU в любом ДЦ со свободной картой — это важнее скорости первого
-# старта, т.к. в дефицитных регионах (напр. Исландия) том запирает в нехватке GPU.
-# Образ толще (~8 ГБ) -> на Runpod-эндпоинте нужен Container Disk >= 30 GB и
-# включённый FlashBoot (кэширует образ, дальнейшие холодные старты быстрые).
-ENV HF_HOME=/root/.cache/huggingface
-RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download('Systran/faster-whisper-large-v3')"
+# Веса large-v3 НЕ запекаем: образ остаётся лёгким (~2 ГБ) и пуллится за секунды
+# на любом новом воркере. Модель (3 ГБ) хранится на подключённом Runpod Network
+# Volume (/runpod-volume) и качается туда ОДИН РАЗ при первом старте, дальше
+# переиспользуется всеми холодными стартами. См. docs/DECISIONS.md ADR-12
+# и docs/HOSTING.md -> "Network Volume".
+# ВАЖНО: том создавать в дата-центре с ХОРОШИМ запасом GPU (не в дефицитном).
+ENV HF_HOME=/runpod-volume/hf-cache
 
 COPY app ./app
 COPY serverless ./serverless
