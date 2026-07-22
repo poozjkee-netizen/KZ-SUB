@@ -1,0 +1,33 @@
+name: CI
+
+# Прогон тестов бэкенда NP SUB на каждый push/PR.
+# Тяжёлый faster-whisper НЕ ставим: dep-free тесты его не импортируют, а
+# интеграционный test_api мокает модель. Нужны только лёгкие пакеты.
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install light test deps
+        run: pip install fastapi "httpx<0.28" python-multipart pytest
+
+      - name: Run tests
+        run: pytest

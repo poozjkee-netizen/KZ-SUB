@@ -1,0 +1,32 @@
+NP SUB — Proprietary Software License
+Copyright (c) 2026 np3_player. All rights reserved.
+Барлық құқықтары қорғалған. Все права защищены.
+
+This software and associated files (the "Software"), including the Premiere Pro
+plugin ("NP SUB"), the backend gateway, and the transcription worker, are the
+proprietary and confidential property of the copyright holder.
+
+NOT open source. Unless a separate written agreement states otherwise:
+
+1. No permission is granted to copy, modify, merge, publish, distribute,
+   sublicense, sell, or create derivative works of the Software, in whole or in
+   part.
+2. No permission is granted to reverse engineer, decompile, or disassemble the
+   Software, except to the extent such restriction is prohibited by applicable law.
+3. Access to this source repository does not grant any license to the Software.
+   It is provided for authorized development and operation only.
+
+End users of the NP SUB plugin receive a limited, non-transferable right to use
+the plugin via a valid activation key, subject to the product's terms. Activation
+keys are bound to a limited number of devices and may not be shared.
+
+Third-party components retain their own licenses:
+- `.claude/skills/ui-ux-pro-max/` — vendored third-party skill (see its own files).
+- Fonts (e.g., Cera Pro by TypeMates) are NOT bundled and require the end user's
+  own license; the plugin only references locally installed fonts.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
+
+For licensing inquiries, contact the copyright holder (Instagram: @np3_player).

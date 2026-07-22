@@ -1,4 +1,4 @@
-# Архитектура KZ-SUB
+# Архитектура NP SUB
 
 ## Обзор
 
@@ -11,7 +11,7 @@ Premiere Pro
         │  1. host.jsx: exportAsMediaDirect → WAV активной секвенции
         │  2. main.js: multipart POST аудио → API
         ▼
-KZ-SUB API (FastAPI)
+NP SUB API (FastAPI)
         │  3. quota.py: проверка ключа/лимита
         │  4. transcribe.py: faster-whisper (kk) → сегменты + пословные тайм-коды
         │  5. segmentation.py: нарезка в аккуратные реплики (длина/время/паузы)

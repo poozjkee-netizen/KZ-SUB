@@ -1,4 +1,4 @@
-# KZ-SUB Backend
+# NP SUB Backend
 
 API транскрибации казахской речи: аудио → субтитры `.srt`.
 

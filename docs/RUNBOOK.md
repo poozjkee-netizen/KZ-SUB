@@ -51,7 +51,7 @@ Premiere не умеет экспортировать секвенцию без 
 
 ## Шаг 4. Открыть панель и проверить связь
 
-1. Premiere → **Window → Extensions → «KZ-SUB — қазақша субтитр»**.
+1. Premiere → **Window → Extensions → «NP SUB»**.
 2. В панели:
    - **API URL:** `http://localhost:8000` (по умолчанию уже стоит).
    - **API-кілт:** `dev-key`.

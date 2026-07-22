@@ -1,4 +1,4 @@
-# KZ-SUB — авто-субтитры на казахском для Adobe Premiere Pro
+# NP SUB — авто-субтитры на казахском для Adobe Premiere Pro
 
 Плагин для Premiere Pro, который автоматически распознаёт **казахскую речь** и
 вставляет субтитры в таймлайн. Premiere «из коробки» не транскрибирует казахский —
@@ -8,7 +8,7 @@
 
 ```
 ┌─────────────────────────┐        ┌──────────────────────────────┐
-│   Панель в Premiere      │        │       Бэкенд (KZ-SUB API)     │
+│   Панель в Premiere      │        │       Бэкенд (NP SUB API)     │
 │   (CEP, HTML/JS/JSX)     │        │       FastAPI + Whisper       │
 │                          │        │                              │
 │ 1. Выгружает аудио  ─────┼───────▶│ 2. Транскрибирует казахский   │
@@ -42,7 +42,7 @@ bash scripts/install-macos.sh          # Windows: scripts\install-windows.ps1
 # 2. Запустить бэкенд
 bash scripts/run-backend.sh            # Windows: scripts\run-backend.bat
 ```
-Затем в Premiere: **Window → Extensions → KZ-SUB**, ключ `dev-key`, «Тест» →
+Затем в Premiere: **Window → Extensions → NP SUB**, ключ `dev-key`, «Тест» →
 выбрать `.epr` пресет → «Субтитр жасау».
 
 Ручная установка и детали — [`plugin/README.md`](plugin/README.md),
