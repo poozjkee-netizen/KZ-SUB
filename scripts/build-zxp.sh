@@ -8,7 +8,7 @@
 # Запуск:
 #   ZXPSIGNCMD=/path/to/ZXPSignCmd bash scripts/build-zxp.sh
 #
-# Результат: dist/KZ-SUB.zxp  (+ самоподписанный сертификат dist/kzsub-cert.p12)
+# Результат: dist/NP-SUB-<версия>.zxp  (+ самоподписанный сертификат dist/kzsub-cert.p12)
 #
 set -euo pipefail
 
@@ -20,7 +20,13 @@ DIST="$ROOT/dist"
 SIGN="${ZXPSIGNCMD:-ZXPSignCmd}"
 CERT="$DIST/kzsub-cert.p12"
 CERT_PASS="${KZSUB_CERT_PASS:-kzsub2026}"
-ZXP="$DIST/NP-SUB.zxp"
+
+# Версия берётся из манифеста — имя файла всегда совпадает с версией панели,
+# чтобы не путать сборки: dist/NP-SUB-<версия>.zxp.
+VERSION="$(grep -o 'ExtensionBundleVersion="[^"]*"' "$PLUGIN/CSXS/manifest.xml" \
+           | head -1 | sed 's/.*="\(.*\)"/\1/')"
+VERSION="${VERSION:-dev}"
+ZXP="$DIST/NP-SUB-$VERSION.zxp"
 
 # Данные для самоподписанного сертификата (можно переопределить переменными).
 CERT_COUNTRY="${KZSUB_CERT_COUNTRY:-KZ}"

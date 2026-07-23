@@ -200,5 +200,5 @@ bash scripts/run-backend.sh
 cd backend && fly deploy --remote-only
 
 # Сборка подписанного плагина
-ZXPSIGNCMD=~/bin/ZXPSignCmd bash scripts/build-zxp.sh   # → dist/NP-SUB.zxp
+ZXPSIGNCMD=~/bin/ZXPSignCmd bash scripts/build-zxp.sh   # → dist/NP-SUB-<версия>.zxp
 ```
