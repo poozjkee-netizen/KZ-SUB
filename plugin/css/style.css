@@ -131,7 +131,9 @@ body {
   transition: border-color 160ms ease;
 }
 .lang-wrap:hover { border-color: var(--border-strong); }
-.lang-wrap.hidden { display: none; }
+/* В настройках прячем выбор языка субтитров, но сохраняем его место в шапке,
+   чтобы шестерёнка не прыгала (visibility, а не display). */
+.lang-wrap.hidden { visibility: hidden; }
 .lang-icon { color: var(--muted); flex: none; }
 .lang-select {
   width: auto;

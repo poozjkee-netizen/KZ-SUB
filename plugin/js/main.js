@@ -1,11 +1,13 @@
 /*
- * main.js — логика панели KZ-SUB (минималистичный UI).
+ * main.js — логика панели NP SUB (минималистичный UI).
  *
  * Поток: экспорт аудио (ExtendScript) -> загрузка на бэкенд -> .srt ->
  * вставка субтитров в Premiere (createCaptionTrack).
  *
- * Во время работы показывается неоновый лоадер (без подписей этапов);
- * текст статуса используется для результата и ошибок.
+ * Локализация: ВСЕ видимые строки берутся из i18n.js через I18N.t(key).
+ * Язык интерфейса выбирается в Настройках (рус/каз), сохраняется в
+ * localStorage и восстанавливается при старте. Захардкоженного текста в этой
+ * логике нет — только семантические ключи.
  */
 (function () {
   "use strict";
@@ -50,6 +52,7 @@
     quote: document.getElementById("quote"),
     poweredBy: document.getElementById("poweredBy"),
     langWrap: document.querySelector(".lang-wrap"),
+    uiLangSelect: document.getElementById("uiLangSelect"),
     // Прогресс
     progress: document.getElementById("progress"),
     progressStage: document.getElementById("progressStage"),
@@ -62,6 +65,9 @@
     activationStatus: document.getElementById("activationStatus"),
   };
 
+  // Короткий алиас переводчика.
+  function t(key, vars) { return I18N.t(key, vars); }
+
   // Общее состояние видимости центра: кнопку прячем и на время обработки,
   // и в режиме настроек. Держим флаги, чтобы не конфликтовали.
   var state = { busy: false, settingsOpen: false };
@@ -72,48 +78,45 @@
     els.run.disabled = hide;
   }
 
-  // --- Надпись кнопки: каз ⇄ рус, смена раз в 5 секунд через затухание.
-  //     Затухает весь контент кнопки (иконка вместе с текстом). ---
-  var RUN_LABELS = ["СУБТИТР ЖАСАУ", "СОЗДАТЬ СУБТИТРЫ"];
-  var runLabelIdx = 0;
+  // --- Применение локали к статичным элементам DOM ------------------------
+  // Проходим по data-i18n / data-i18n-ph / data-i18n-title и подставляем
+  // перевод текущего языка. Вызывается при старте и при смене языка.
+  function applyLocale() {
+    var i, nodes;
+    nodes = document.querySelectorAll("[data-i18n]");
+    for (i = 0; i < nodes.length; i++) {
+      nodes[i].textContent = t(nodes[i].getAttribute("data-i18n"));
+    }
+    nodes = document.querySelectorAll("[data-i18n-ph]");
+    for (i = 0; i < nodes.length; i++) {
+      nodes[i].setAttribute("placeholder", t(nodes[i].getAttribute("data-i18n-ph")));
+    }
+    nodes = document.querySelectorAll("[data-i18n-title]");
+    for (i = 0; i < nodes.length; i++) {
+      var v = t(nodes[i].getAttribute("data-i18n-title"));
+      nodes[i].setAttribute("title", v);
+      nodes[i].setAttribute("aria-label", v);
+    }
+    document.documentElement.setAttribute("lang", I18N.getLocale());
+  }
 
-  setInterval(function () {
-    // Пока кнопка скрыта (идёт обработка) — не крутим.
-    if (els.run.classList.contains("hidden")) { return; }
-    els.runContent.classList.add("faded");
-    setTimeout(function () {
-      runLabelIdx = (runLabelIdx + 1) % RUN_LABELS.length;
-      els.runLabel.textContent = RUN_LABELS[runLabelIdx];
-      els.runContent.classList.remove("faded");
-    }, 320); // ждём конца затухания
-  }, 5000);
-
-  // --- Цитаты на время обработки: рус и каз по очереди, по кругу ---
-  var QUOTES = [
-    "Искусство правит миром",
-    "Өнер — өмірдің тынысы",            // Искусство — дыхание жизни
-    "Красота — в мелочах",
-    "Әр кадр — бір әлем",               // Каждый кадр — целый мир
-    "Творчество — это смелость",
-    "Шабыт жүректен шығады",            // Вдохновение идёт от сердца
-    "Каждый кадр имеет значение",
-    "Сөз — күміс, субтитр — алтын",     // Слово — серебро, субтитр — золото
-    "Великое начинается с малого",
-    "Ұлы іс кішіден басталады",         // Великое начинается с малого
-  ];
+  // --- Цитаты на время обработки (в текущем языке интерфейса) -------------
   var quoteIdx = -1;
   var quoteTimer = null;
+  var quotesList = [];
 
   function nextQuote() {
+    if (!quotesList.length) { return; }
     els.quote.classList.add("faded");
     setTimeout(function () {
-      quoteIdx = (quoteIdx + 1) % QUOTES.length;
-      els.quote.textContent = QUOTES[quoteIdx];
+      quoteIdx = (quoteIdx + 1) % quotesList.length;
+      els.quote.textContent = quotesList[quoteIdx];
       els.quote.classList.remove("faded");
     }, 320);
   }
 
   function startQuotes() {
+    quotesList = I18N.raw("quotes") || [];
     quoteIdx = -1;
     els.quote.classList.remove("hidden");
     nextQuote();
@@ -129,21 +132,18 @@
   // --- Прогресс обработки по этапам ---------------------------------------
   // Реальный процент от сервера получить нельзя (Runpod не отдаёт прогресс),
   // поэтому двигаем полосу по «якорям» реальных этапов конвейера, а на долгом
-  // распознавании плавно докручиваем к цели (асимптотически, не достигая её),
-  // чтобы UI не выглядел зависшим. Цель этапа — target; текущее значение cur
-  // подтягивается к target на каждом тике. Так короткие этапы «долетают»
-  // быстро, а длинный этап распознавания живёт, пока не придёт результат.
+  // распознавании плавно докручиваем к цели (не достигая её), чтобы UI не
+  // выглядел зависшим. Подписи этапов берутся из i18n по ключам.
   var PROGRESS_STAGES = {
-    prepare:   { pct: 5,   kk: "Жоба дайындалуда…",   ru: "Подготовка проекта…" },
-    export:    { pct: 20,  kk: "Аудио экспортталуда…", ru: "Экспорт аудио…" },
-    upload:    { pct: 40,  kk: "Файл жүктелуде…",      ru: "Загрузка файла…" },
-    recognize: { pct: 70,  kk: "Сөйлеу танылуда…",     ru: "Распознавание речи…" },
-    build:     { pct: 90,  kk: "Субтитрлер жасалуда…", ru: "Создание субтитров…" },
-    importing: { pct: 100, kk: "Premiere-ге импорт…",  ru: "Импорт в Premiere…" },
+    prepare:   { pct: 5,   key: "progress.prepare" },
+    export:    { pct: 20,  key: "progress.export" },
+    upload:    { pct: 40,  key: "progress.upload" },
+    recognize: { pct: 70,  key: "progress.recognize" },
+    build:     { pct: 90,  key: "progress.build" },
+    importing: { pct: 100, key: "progress.import" },
   };
 
   var progCur = 0, progTarget = 0, progTimer = null;
-  var progStageKk = "", progStageRu = "", progStageShown = false, progStageTimer = null;
 
   function progRender() {
     var v = Math.round(progCur);
@@ -155,51 +155,29 @@
   function progTick() {
     var diff = progTarget - progCur;
     if (diff <= 0.15) { return; }
-    // Замедляемся у цели: короткие этапы долетают, длинный распознавания
-    // подходит к 70% и «зависает» там, пока реальный результат не сдвинет цель.
     progCur += Math.max(diff * 0.06, 0.05);
     if (progCur > progTarget) { progCur = progTarget; }
     progRender();
   }
 
-  function renderProgStage() {
-    els.progressStage.textContent = progStageShown ? progStageRu : progStageKk;
-  }
-
-  function swapProgStageLang() {
-    if (!progStageRu || progStageRu === progStageKk) { return; }
-    els.progressStage.classList.add("faded");
-    setTimeout(function () {
-      progStageShown = !progStageShown;
-      renderProgStage();
-      els.progressStage.classList.remove("faded");
-    }, 320);
-  }
-
-  // Перейти к этапу: поднять цель и сменить подпись (каз, затем каз⇄рус по кругу).
+  // Перейти к этапу: поднять цель и сменить подпись (в текущем языке).
   function progStage(name) {
     var s = PROGRESS_STAGES[name];
     if (!s) { return; }
     if (s.pct > progTarget) { progTarget = s.pct; }
-    progStageKk = s.kk;
-    progStageRu = s.ru;
-    progStageShown = false;
-    renderProgStage();
+    els.progressStage.textContent = t(s.key);
   }
 
   function startProgress() {
     progCur = 0;
     progTarget = 0;
-    progStageShown = false;
     els.progress.classList.remove("hidden");
     progStage("prepare");
     progRender();
     progTimer = setInterval(progTick, 60);
-    progStageTimer = setInterval(swapProgStageLang, 5000);
   }
 
   function finishProgress() {
-    // Красивое завершение: доводим до 100% перед скрытием.
     progTarget = 100;
     progCur = 100;
     progRender();
@@ -207,8 +185,38 @@
 
   function stopProgress() {
     if (progTimer) { clearInterval(progTimer); progTimer = null; }
-    if (progStageTimer) { clearInterval(progStageTimer); progStageTimer = null; }
     els.progress.classList.add("hidden");
+  }
+
+  // Подсказки терпения: если ответ идёт дольше обычного — вероятно, сервер
+  // (GPU) «просыпается» после простоя. Без этого пользователь решит, что
+  // плагин завис, хотя идёт нормальный холодный старт.
+  var PATIENCE_NOTES = [
+    [20000, "patience.1"],
+    [60000, "patience.2"],
+    [150000, "patience.3"],
+  ];
+  var patienceTimers = [];
+
+  function startPatienceNotes() {
+    for (var i = 0; i < PATIENCE_NOTES.length; i++) {
+      (function (pair) {
+        patienceTimers.push(setTimeout(function () {
+          setStatus(t(pair[1]));
+        }, pair[0]));
+      })(PATIENCE_NOTES[i]);
+    }
+  }
+
+  function stopPatienceNotes() {
+    for (var i = 0; i < patienceTimers.length; i++) { clearTimeout(patienceTimers[i]); }
+    patienceTimers = [];
+  }
+
+  // --- Статус (одна строка, язык — текущий) --------------------------------
+  function setStatus(msg, kind) {
+    els.status.className = "status" + (kind ? " " + kind : "");
+    els.status.textContent = msg || "";
   }
 
   // --- Восстановление настроек ---
@@ -234,68 +242,64 @@
     } catch (e) {}
   }
 
-  // --- Двуязычный статус: kk показывается, через 5с плавно меняется на ru ---
-  var SEP = "\u241F"; // невидимый разделитель kk<SEP>ru
-  function bi(kk, ru) { return kk + SEP + ru; }           // собрать двуязычную строку
-  function biErr(kk, ru) { return new Error(bi(kk, ru)); } // двуязычная ошибка
-
-  var statusTimer = null;
-  var statusKind = "";
-  var statusKk = "";
-  var statusRu = "";
-  var statusRuShown = false;
-
-  function renderStatus(text) {
-    els.status.textContent = text || "";
-    els.status.className = "status" + (statusKind ? " " + statusKind : "");
+  // Ошибка с ключом перевода: несём ключ i18n и параметры до места показа,
+  // где переводим на текущий язык (а не фиксируем язык в момент броска).
+  function ierr(key, vars) {
+    var e = new Error(key);
+    e.i18nKey = key;
+    e.vars = vars || null;
+    return e;
+  }
+  // Ошибка с уже готовым (переведённым) текстом.
+  function rerr(msg) {
+    var e = new Error(msg);
+    e.resolved = true;
+    return e;
+  }
+  // Достать текст для показа из любой ошибки.
+  function errText(err) {
+    if (err && err.i18nKey) { return t(err.i18nKey, err.vars); }
+    if (err && err.resolved) { return err.message; }
+    var m = (err && err.message) ? err.message : String(err);
+    return m.replace(/^ERROR:\s*/, "");
   }
 
-  // msg может быть двуязычной ("kkru") или обычной; ru — явный перевод.
-  function setStatus(msg, kind, ru) {
-    if (statusTimer) { clearInterval(statusTimer); statusTimer = null; }
-    statusKind = kind || "";
-    var parts = String(msg || "").split(SEP);
-    statusKk = parts[0] || "";
-    statusRu = ru || parts[1] || "";
-    statusRuShown = false;
-    renderStatus(statusKk);
-    if (statusRu && statusRu !== statusKk) {
-      statusTimer = setInterval(swapStatusLang, 5000);
-    }
+  // --- Перевод кодов, возвращаемых host.jsx (Premiere) --------------------
+  // host.jsx отдаёт машинные коды ("ERROR:NO_SEQUENCE", "BIN:UNSUPPORTED"),
+  // а текст живёт в словаре — чтобы в ExtendScript не было русских строк.
+  var HOST_ERR = {
+    NO_SEQUENCE: "host.noSequence",
+    NO_PRESET: "host.noPreset",
+    EXPORT_FAILED: "host.exportFailed",
+    SRT_NOT_FOUND: "host.srtNotFound",
+    IMPORT_FAILED: "host.importFailed",
+  };
+  var BIN_REASON = {
+    NOT_FOUND: "bin.notFound",
+    NO_SEQUENCE: "bin.noSequence",
+    CAPTION_FALSE: "bin.captionFalse",
+    CAPTION_ERR: "bin.captionErr",
+    UNSUPPORTED: "bin.unsupported",
+  };
+
+  function splitCode(body) {
+    var idx = body.indexOf(":");
+    return {
+      code: idx >= 0 ? body.slice(0, idx) : body,
+      detail: idx >= 0 ? body.slice(idx + 1) : "",
+    };
   }
 
-  function swapStatusLang() {
-    els.status.classList.add("faded");
-    setTimeout(function () {
-      statusRuShown = !statusRuShown;
-      renderStatus(statusRuShown ? statusRu : statusKk);
-    }, 320);
+  function hostErrToMsg(res) {
+    var c = splitCode(String(res).replace(/^ERROR:\s*/, ""));
+    if (HOST_ERR[c.code]) { return t(HOST_ERR[c.code]); }
+    return t("err.generic", { detail: c.detail || c.code });
   }
 
-  // Подсказки терпения: если ответ идёт дольше обычного — вероятно, сервер
-  // (GPU) сейчас «просыпается» после простоя. Без этого пользователь решит,
-  // что плагин завис, хотя на деле идёт нормальный холодный старт.
-  var PATIENCE_NOTES = [
-    [20000, bi("Сервер іске қосылуда, күте тұрыңыз…",
-               "Сервер запускается, подождите немного…")],
-    [60000, bi("Бірінші рет сәл ұзағырақ болуы мүмкін…",
-               "В первый раз может занять чуть дольше…")],
-    [150000, bi("Әлі жұмыс істеп жатыр, дәл қазір бас тартпаңыз…",
-                "Всё ещё работает, не отменяйте прямо сейчас…")],
-  ];
-  var patienceTimers = [];
-
-  function startPatienceNotes() {
-    PATIENCE_NOTES.forEach(function (pair) {
-      patienceTimers.push(setTimeout(function () {
-        setStatus(pair[1]);
-      }, pair[0]));
-    });
-  }
-
-  function stopPatienceNotes() {
-    patienceTimers.forEach(clearTimeout);
-    patienceTimers = [];
+  function binReasonToMsg(res) {
+    var c = splitCode(String(res).replace(/^BIN:\s*/, ""));
+    if (BIN_REASON[c.code]) { return t(BIN_REASON[c.code]); }
+    return c.detail || c.code;
   }
 
   // Занято: прячем кнопку, показываем неоновый спиннер, прогресс и цитаты.
@@ -315,15 +319,15 @@
     }
   }
 
-  // Режим настроек: чистый экран — только поле ключа и подпись «powered by
-  // danik np». Прячем кнопку «Создать субтитры», выбор языка и остаточный
-  // статус (например, зелёное «Готово» от прошлого прогона).
+  // Режим настроек: чистый экран — только язык интерфейса и поле ключа, внизу
+  // «powered by danik np». Прячем кнопку «Создать субтитры», выбор языка
+  // субтитров (в шапке) и остаточный статус. Шестерёнка остаётся на месте.
   function toggleSettings() {
     state.settingsOpen = !state.settingsOpen;
     els.settingsPanel.classList.toggle("hidden", !state.settingsOpen);
     els.poweredBy.classList.toggle("hidden", !state.settingsOpen);
     els.langWrap.classList.toggle("hidden", state.settingsOpen);
-    if (state.settingsOpen) { setStatus(""); } // убрать остаточный статус
+    if (state.settingsOpen) { setStatus(""); }
     refreshRunVisibility();
   }
 
@@ -366,13 +370,13 @@
           var text = Buffer.concat(chunks).toString("utf8");
           if (res.statusCode >= 200 && res.statusCode < 300) {
             try { resolve(JSON.parse(text)); }
-            catch (e) { reject(biErr("Сервер жауабы түсініксіз", "Непонятный ответ сервера")); }
+            catch (e) { reject(ierr("test.badResponse")); }
           } else {
             reject(new Error("HTTP " + res.statusCode));
           }
         });
       });
-      req.setTimeout(HEALTH_TIMEOUT_MS, function () { req.destroy(new Error("Таймаут")); });
+      req.setTimeout(HEALTH_TIMEOUT_MS, function () { req.destroy(ierr("err.timeout")); });
       req.on("error", reject);
       req.end();
     });
@@ -410,32 +414,26 @@
           if (res.statusCode >= 200 && res.statusCode < 300) {
             resolve(text);
           } else if (res.statusCode === 401) {
-            reject(biErr("Кілт қатесі. Қолдау қызметіне жазыңыз.",
-                         "Ошибка ключа. Напишите в поддержку."));
+            reject(ierr("err.key401"));
           } else if (res.statusCode === 402) {
-            reject(biErr("Лимит таусылды. Жазылымды жаңартыңыз.",
-                         "Лимит исчерпан. Обновите подписку."));
+            reject(ierr("err.quota402"));
           } else if (res.statusCode === 403) {
-            reject(biErr("Бұл кілт басқа құрылғыға тіркелген. Қолдау қызметіне жазыңыз.",
-                         "Этот ключ привязан к другому устройству. Напишите в поддержку."));
+            reject(ierr("err.device403"));
           } else if (res.statusCode === 413) {
-            reject(biErr("Видео тым ұзын.", "Видео слишком длинное."));
+            reject(ierr("err.tooLong413"));
           } else {
-            reject(biErr("Сервер қатесі (HTTP " + res.statusCode + ").",
-                         "Ошибка сервера (HTTP " + res.statusCode + ")."));
+            reject(ierr("err.server", { code: res.statusCode }));
           }
         });
       });
       req.setTimeout(UPLOAD_TIMEOUT_MS, function () {
-        req.destroy(biErr("Сервер жауап бермеді.", "Сервер не отвечает."));
+        req.destroy(ierr("err.noResponse"));
       });
-      req.on("error", function (e) {
-        reject(biErr("Байланыс жоқ. Кейінірек қайталап көріңіз.",
-                     "Нет соединения. Повторите позже."));
+      req.on("error", function () {
+        reject(ierr("err.noConnection"));
       });
       // 'finish' — тело запроса ушло в сокет: файл отправлен, дальше сервер
-      // распознаёт речь. Реальный «якорь» для перехода прогресса на этап
-      // распознавания (самый долгий, включая холодный старт GPU).
+      // распознаёт речь. Реальный «якорь» перехода прогресса на распознавание.
       req.on("finish", function () { if (onSent) { onSent(); } });
       req.write(body);
       req.end();
@@ -451,19 +449,17 @@
   function onTest() {
     var apiUrl = els.apiUrl.value.trim();
     if (!apiUrl) {
-      return setStatus("Сервер адресін көрсетіңіз.", "error", "Укажите адрес сервера.");
+      return setStatus(t("test.noUrl"), "error");
     }
     saveSettings();
     els.test.disabled = true;
-    setStatus("Тексерілуде…", null, "Проверка…");
+    setStatus(t("test.checking"));
     checkHealth(apiUrl)
       .then(function (info) {
-        var m = info.model || "?";
-        setStatus("Сервер дайын · " + m, "ok", "Сервер готов · " + m);
+        setStatus(t("test.ready", { model: info.model || "?" }), "ok");
       })
       .catch(function (err) {
-        var p = String(err && err.message ? err.message : err).split(SEP);
-        setStatus("Байланыс жоқ: " + p[0], "error", "Нет соединения: " + (p[1] || p[0]));
+        setStatus(t("test.noConnection", { detail: errText(err) }), "error");
       })
       .then(function () { els.test.disabled = false; });
   }
@@ -474,11 +470,11 @@
       .then(function (res) {
         if (res === "CANCEL" || !res) { return; }
         if (res.indexOf("ERROR:") === 0) {
-          return setStatus(res.replace(/^ERROR:\s*/, ""), "error");
+          return setStatus(hostErrToMsg(res), "error");
         }
         els.presetPath.value = res;
         saveSettings();
-        setStatus("Пресет сақталды.", "ok", "Пресет сохранён.");
+        setStatus(t("preset.saved"), "ok");
       })
       .then(function () { els.pickPreset.disabled = false; });
   }
@@ -493,8 +489,7 @@
       return;
     }
     if (!apiUrl) {
-      return setStatus("Қате конфигурация. Панельді қайта ашыңыз.", "error",
-                       "Ошибка конфигурации. Переоткройте панель.");
+      return setStatus(t("err.config"), "error");
     }
     saveSettings();
     setBusy(true);
@@ -505,7 +500,7 @@
     evalScript('kzsubExportSequenceAudio("' + esc(presetPath) + '")')
       .then(function (wavPath) {
         if (!wavPath || wavPath.indexOf("ERROR:") === 0) {
-          throw new Error(wavPath || bi("Экспорт сәтсіз.", "Ошибка экспорта."));
+          throw rerr(wavPath ? hostErrToMsg(wavPath) : t("err.export"));
         }
         progStage("upload");
         return uploadForSrt(apiUrl, apiKey, wavPath, function () {
@@ -521,26 +516,20 @@
         progStage("importing");
         return evalScript('kzsubImportSrt("' + esc(srtPath) + '")').then(function (res) {
           try { fs.unlinkSync(r.wavPath); } catch (e) {}
-          if (res && res.indexOf("ERROR:") === 0) { throw new Error(res); }
+          if (res && res.indexOf("ERROR:") === 0) { throw rerr(hostErrToMsg(res)); }
           return res;
         });
       })
       .then(function (res) {
         finishProgress();
         if (res === "INSERTED") {
-          setStatus("Дайын! Субтитрлер таймлайнда.", "ok",
-                    "Готово! Субтитры на таймлайне.");
+          setStatus(t("result.inserted"), "ok");
         } else {
-          var why = String(res).replace(/^BIN:\s*/, "");
-          setStatus("Субтитрлер жобаға импортталды — таймлайнға сүйреңіз.\n(" + why + ")", "ok",
-                    "Субтитры импортированы в проект — перетащите на таймлайн.\n(" + why + ")");
+          setStatus(t("result.bin", { reason: binReasonToMsg(res) }), "ok");
         }
       })
       .catch(function (err) {
-        var msg = (err && err.message) ? err.message : String(err);
-        msg = msg.replace(/^ERROR:\s*/, "");
-        var p = msg.split(SEP);
-        setStatus(p[0], "error", p[1] || "");
+        setStatus(errText(err), "error");
       })
       .then(function () { setBusy(false); });
   }
@@ -572,22 +561,42 @@
   function activate() {
     var key = els.activationKey.value.trim();
     if (!key) {
-      return setActStatus("Кілтіңізді енгізіңіз · Введите ключ", true);
+      return setActStatus(t("activation.enterKey"), true);
     }
-    // Сохраняем ключ в основное поле и localStorage — это и есть «активация».
-    // Валидность ключа проверяется сервером при первом создании субтитров
-    // (неверный ключ вернёт понятную ошибку 401).
+    // Сохраняем ключ — это и есть «активация». Валидность проверяется сервером
+    // при первом создании субтитров (неверный ключ вернёт понятную ошибку 401).
     els.apiKey.value = key;
     saveSettings();
     hideActivation();
-    setStatus("Қош келдіңіз! Дайынбыз.", "ok", "Добро пожаловать! Готово к работе.");
+    setStatus(t("welcome"), "ok");
   }
+
+  // --- Смена языка интерфейса --------------------------------------------
+  function onUiLangChange() {
+    var code = els.uiLangSelect.value;
+    I18N.setLocale(code);
+    try { localStorage.setItem("kzsub.uiLang", I18N.getLocale()); } catch (e) {}
+    applyLocale();
+    setActStatus("");
+    setStatus(""); // убрать строку статуса на старом языке
+  }
+
+  // --- Инициализация ------------------------------------------------------
+  // Восстанавливаем язык интерфейса и применяем его до показа любого текста.
+  (function initLocale() {
+    var saved = "";
+    try { saved = localStorage.getItem("kzsub.uiLang") || ""; } catch (e) {}
+    if (saved && I18N.has(saved)) { I18N.setLocale(saved); }
+    els.uiLangSelect.value = I18N.getLocale();
+    applyLocale();
+  })();
 
   els.run.addEventListener("click", runPipeline);
   els.test.addEventListener("click", onTest);
   els.pickPreset.addEventListener("click", onPickPreset);
   els.settingsToggle.addEventListener("click", toggleSettings);
   els.apiKey.addEventListener("change", saveSettings); // ключ сохраняется сразу
+  els.uiLangSelect.addEventListener("change", onUiLangChange);
   els.activationBtn.addEventListener("click", activate);
   els.activationKey.addEventListener("keydown", function (e) {
     if (e.keyCode === 13) { activate(); } // Enter — активировать

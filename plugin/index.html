@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="kk">
+<html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -15,7 +15,7 @@
   </div>
 
   <div class="app">
-    <!-- Шапка: выбор языка (слева) + настройки (справа) -->
+    <!-- Шапка: язык субтитров (слева) + настройки (справа) -->
     <header class="topbar">
       <div class="lang-wrap">
         <svg class="lang-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -23,13 +23,13 @@
           <path d="M2 12h20"/>
           <path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20z"/>
         </svg>
-        <select id="langSelect" class="lang-select" title="Тіл / Язык" aria-label="Тіл / Язык">
-          <option value="kk" selected>Қазақша</option>
-          <option value="soon" disabled>Жақын арада · Русский, English…</option>
+        <select id="langSelect" class="lang-select" data-i18n-title="lang.contentTitle">
+          <option value="kk" selected data-i18n="lang.kazakh">Қазақша</option>
+          <option value="soon" disabled data-i18n="lang.soon">Скоро · Кыргызский, Узбекский</option>
         </select>
       </div>
       <div class="top-actions">
-        <button id="settingsToggle" class="icon-btn" title="Баптаулар" aria-label="Баптаулар">
+        <button id="settingsToggle" class="icon-btn" title="⚙" aria-label="settings">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"/>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -38,15 +38,23 @@
       </div>
     </header>
 
-    <!-- Настройки (за шестерёнкой): только смена ключа активации -->
+    <!-- Настройки (за шестерёнкой): язык интерфейса + ключ активации -->
     <section id="settingsPanel" class="settings hidden">
       <label class="field">
-        <span class="field-label">Кілт / Ключ активации</span>
+        <span class="field-label" data-i18n="settings.uiLangLabel">Язык интерфейса</span>
+        <select id="uiLangSelect">
+          <option value="ru">Русский</option>
+          <option value="kk">Қазақша</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label" data-i18n="settings.keyLabel">Ключ активации</span>
         <div class="row">
-          <input id="apiKey" type="password" placeholder="Кілтіңізді енгізіңіз" spellcheck="false" />
-          <button id="test" class="btn-ghost">Тексеру</button>
+          <input id="apiKey" type="password" data-i18n-ph="settings.keyPlaceholder" placeholder="Введите ключ" spellcheck="false" />
+          <button id="test" class="btn-ghost" data-i18n="settings.testBtn">Проверить</button>
         </div>
-        <span class="field-hint">Кілтті ауыстыру осы жерде · Сменить ключ можно здесь</span>
+        <span class="field-hint" data-i18n="settings.keyHint">Сменить ключ можно здесь</span>
       </label>
 
       <!-- Технические параметры скрыты: прод-адрес зашит, пресет — из панели/по умолчанию. -->
@@ -59,22 +67,22 @@
 
     <!-- Центр: кнопка / лоадер + прогресс -->
     <main class="center">
-      <div id="loader" class="loader hidden" role="status" aria-label="Жасалуда">
+      <div id="loader" class="loader hidden" role="status" aria-label="loading">
         <div class="spinner"></div>
         <div class="spinner-glow" aria-hidden="true"></div>
       </div>
 
       <!-- Прогресс обработки по этапам (этап + процент + полоса) -->
       <div id="progress" class="progress hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100">
-        <div id="progressStage" class="progress-stage fade-swap"></div>
+        <div id="progressStage" class="progress-stage"></div>
         <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
         <div id="progressPct" class="progress-pct">0%</div>
       </div>
 
       <button id="run" class="btn-primary">
-        <span id="runContent" class="btn-content fade-swap">
+        <span id="runContent" class="btn-content">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.6L18.5 9.4l-4.7 1.8L12 16l-1.8-4.8L5.5 9.4l4.7-1.8z"/><path d="M19 15l.7 1.8L21.5 17.5l-1.8.7L19 20l-.7-1.8L16.5 17.5l1.8-.7z"/></svg>
-          <span id="runLabel">СУБТИТР ЖАСАУ</span>
+          <span id="runLabel" data-i18n="run.label">СОЗДАТЬ СУБТИТРЫ</span>
         </span>
       </button>
 
@@ -85,26 +93,27 @@
     <!-- Цитата во время обработки -->
     <div id="quote" class="quote fade-swap hidden" aria-hidden="true"></div>
 
-    <!-- Подпись (видна в режиме настроек) -->
+    <!-- Подпись (видна в режиме настроек) — не переводится -->
     <footer id="poweredBy" class="powered hidden">powered by danik np</footer>
   </div>
 
   <!-- Гейт активации: первый запуск — ввод ключа поверх всего -->
-  <section id="activation" class="activation hidden" aria-label="Активация">
+  <section id="activation" class="activation hidden" aria-label="activation">
     <div class="activation-card">
       <div class="activation-brand">NP&nbsp;SUB</div>
-      <div class="activation-title">Кілтіңізді енгізіңіз</div>
-      <div class="activation-sub">Введите ключ активации</div>
-      <input id="activationKey" type="password" class="activation-input" placeholder="Лицензиялық кілт · Лицензионный ключ" spellcheck="false" />
+      <div class="activation-title" data-i18n="activation.title">Введите ключ активации</div>
+      <div class="activation-sub" data-i18n="activation.sub">Добро пожаловать в NP SUB</div>
+      <input id="activationKey" type="password" class="activation-input" data-i18n-ph="activation.placeholder" placeholder="Лицензионный ключ" spellcheck="false" />
       <button id="activationBtn" class="btn-primary activation-btn">
-        <span>АКТИВТЕНДІРУ · АКТИВИРОВАТЬ</span>
+        <span data-i18n="activation.btn">АКТИВИРОВАТЬ</span>
       </button>
       <div id="activationStatus" class="activation-status" aria-live="polite"></div>
-      <div class="activation-hint">Кілт жоқ па? Қолдау қызметіне жазыңыз · Нет ключа? Напишите в поддержку</div>
+      <div class="activation-hint" data-i18n="activation.hint">Нет ключа? Напишите в поддержку</div>
     </div>
   </section>
 
   <script src="js/CSInterface.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
