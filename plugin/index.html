@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>KZ-SUB</title>
+  <title>NP SUB</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -15,15 +15,18 @@
   </div>
 
   <div class="app">
-    <!-- Шапка: бренд + язык + настройки -->
+    <!-- Шапка: выбор языка (слева) + настройки (справа) -->
     <header class="topbar">
-      <div class="brand">
-        <svg class="ig-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="2" y="2" width="20" height="20" rx="5.5"/>
-          <circle cx="12" cy="12" r="4.5"/>
-          <circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none"/>
+      <div class="lang-wrap">
+        <svg class="lang-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M2 12h20"/>
+          <path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20z"/>
         </svg>
-        <span class="brand-name">@np3_player</span>
+        <select id="langSelect" class="lang-select" title="Тіл / Язык" aria-label="Тіл / Язык">
+          <option value="kk" selected>Қазақша</option>
+          <option value="soon" disabled>Жақын арада · Русский, English…</option>
+        </select>
       </div>
       <div class="top-actions">
         <button id="settingsToggle" class="icon-btn" title="Баптаулар" aria-label="Баптаулар">
@@ -35,22 +38,15 @@
       </div>
     </header>
 
-    <!-- Настройки (за шестерёнкой): язык + ключ активации -->
+    <!-- Настройки (за шестерёнкой): только смена ключа активации -->
     <section id="settingsPanel" class="settings hidden">
-      <label class="field">
-        <span class="field-label">Тіл / Язык</span>
-        <select id="langSelect">
-          <option value="kk" selected>Қазақша</option>
-        </select>
-        <span class="field-hint">Жақын арада — басқа тілдер · Скоро — другие языки</span>
-      </label>
-
       <label class="field">
         <span class="field-label">Кілт / Ключ активации</span>
         <div class="row">
           <input id="apiKey" type="password" placeholder="Кілтіңізді енгізіңіз" spellcheck="false" />
           <button id="test" class="btn-ghost">Тексеру</button>
         </div>
+        <span class="field-hint">Кілтті ауыстыру осы жерде · Сменить ключ можно здесь</span>
       </label>
 
       <!-- Технические параметры скрыты: прод-адрес зашит, пресет — из панели/по умолчанию. -->
@@ -61,11 +57,18 @@
       </div>
     </section>
 
-    <!-- Центр: кнопка / лоадер -->
+    <!-- Центр: кнопка / лоадер + прогресс -->
     <main class="center">
       <div id="loader" class="loader hidden" role="status" aria-label="Жасалуда">
         <div class="spinner"></div>
         <div class="spinner-glow" aria-hidden="true"></div>
+      </div>
+
+      <!-- Прогресс обработки по этапам (этап + процент + полоса) -->
+      <div id="progress" class="progress hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+        <div id="progressStage" class="progress-stage fade-swap"></div>
+        <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+        <div id="progressPct" class="progress-pct">0%</div>
       </div>
 
       <button id="run" class="btn-primary">
@@ -81,7 +84,25 @@
 
     <!-- Цитата во время обработки -->
     <div id="quote" class="quote fade-swap hidden" aria-hidden="true"></div>
+
+    <!-- Подпись (видна в режиме настроек) -->
+    <footer id="poweredBy" class="powered hidden">powered by danik np</footer>
   </div>
+
+  <!-- Гейт активации: первый запуск — ввод ключа поверх всего -->
+  <section id="activation" class="activation hidden" aria-label="Активация">
+    <div class="activation-card">
+      <div class="activation-brand">NP&nbsp;SUB</div>
+      <div class="activation-title">Кілтіңізді енгізіңіз</div>
+      <div class="activation-sub">Введите ключ активации</div>
+      <input id="activationKey" type="password" class="activation-input" placeholder="Лицензиялық кілт · Лицензионный ключ" spellcheck="false" />
+      <button id="activationBtn" class="btn-primary activation-btn">
+        <span>АКТИВТЕНДІРУ · АКТИВИРОВАТЬ</span>
+      </button>
+      <div id="activationStatus" class="activation-status" aria-live="polite"></div>
+      <div class="activation-hint">Кілт жоқ па? Қолдау қызметіне жазыңыз · Нет ключа? Напишите в поддержку</div>
+    </div>
+  </section>
 
   <script src="js/CSInterface.js"></script>
   <script src="js/main.js"></script>

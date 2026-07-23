@@ -48,7 +48,28 @@
     runLabel: document.getElementById("runLabel"),
     runContent: document.getElementById("runContent"),
     quote: document.getElementById("quote"),
+    poweredBy: document.getElementById("poweredBy"),
+    // Прогресс
+    progress: document.getElementById("progress"),
+    progressStage: document.getElementById("progressStage"),
+    progressFill: document.getElementById("progressFill"),
+    progressPct: document.getElementById("progressPct"),
+    // Гейт активации (первый запуск)
+    activation: document.getElementById("activation"),
+    activationKey: document.getElementById("activationKey"),
+    activationBtn: document.getElementById("activationBtn"),
+    activationStatus: document.getElementById("activationStatus"),
   };
+
+  // Общее состояние видимости центра: кнопку прячем и на время обработки,
+  // и в режиме настроек. Держим флаги, чтобы не конфликтовали.
+  var state = { busy: false, settingsOpen: false };
+
+  function refreshRunVisibility() {
+    var hide = state.busy || state.settingsOpen;
+    els.run.classList.toggle("hidden", hide);
+    els.run.disabled = hide;
+  }
 
   // --- Надпись кнопки: каз ⇄ рус, смена раз в 5 секунд через затухание.
   //     Затухает весь контент кнопки (иконка вместе с текстом). ---
@@ -102,6 +123,91 @@
     if (quoteTimer) { clearInterval(quoteTimer); quoteTimer = null; }
     els.quote.classList.add("hidden");
     els.quote.textContent = "";
+  }
+
+  // --- Прогресс обработки по этапам ---------------------------------------
+  // Реальный процент от сервера получить нельзя (Runpod не отдаёт прогресс),
+  // поэтому двигаем полосу по «якорям» реальных этапов конвейера, а на долгом
+  // распознавании плавно докручиваем к цели (асимптотически, не достигая её),
+  // чтобы UI не выглядел зависшим. Цель этапа — target; текущее значение cur
+  // подтягивается к target на каждом тике. Так короткие этапы «долетают»
+  // быстро, а длинный этап распознавания живёт, пока не придёт результат.
+  var PROGRESS_STAGES = {
+    prepare:   { pct: 5,   kk: "Жоба дайындалуда…",   ru: "Подготовка проекта…" },
+    export:    { pct: 20,  kk: "Аудио экспортталуда…", ru: "Экспорт аудио…" },
+    upload:    { pct: 40,  kk: "Файл жүктелуде…",      ru: "Загрузка файла…" },
+    recognize: { pct: 70,  kk: "Сөйлеу танылуда…",     ru: "Распознавание речи…" },
+    build:     { pct: 90,  kk: "Субтитрлер жасалуда…", ru: "Создание субтитров…" },
+    importing: { pct: 100, kk: "Premiere-ге импорт…",  ru: "Импорт в Premiere…" },
+  };
+
+  var progCur = 0, progTarget = 0, progTimer = null;
+  var progStageKk = "", progStageRu = "", progStageShown = false, progStageTimer = null;
+
+  function progRender() {
+    var v = Math.round(progCur);
+    els.progressFill.style.width = progCur.toFixed(1) + "%";
+    els.progressPct.textContent = v + "%";
+    els.progress.setAttribute("aria-valuenow", v);
+  }
+
+  function progTick() {
+    var diff = progTarget - progCur;
+    if (diff <= 0.15) { return; }
+    // Замедляемся у цели: короткие этапы долетают, длинный распознавания
+    // подходит к 70% и «зависает» там, пока реальный результат не сдвинет цель.
+    progCur += Math.max(diff * 0.06, 0.05);
+    if (progCur > progTarget) { progCur = progTarget; }
+    progRender();
+  }
+
+  function renderProgStage() {
+    els.progressStage.textContent = progStageShown ? progStageRu : progStageKk;
+  }
+
+  function swapProgStageLang() {
+    if (!progStageRu || progStageRu === progStageKk) { return; }
+    els.progressStage.classList.add("faded");
+    setTimeout(function () {
+      progStageShown = !progStageShown;
+      renderProgStage();
+      els.progressStage.classList.remove("faded");
+    }, 320);
+  }
+
+  // Перейти к этапу: поднять цель и сменить подпись (каз, затем каз⇄рус по кругу).
+  function progStage(name) {
+    var s = PROGRESS_STAGES[name];
+    if (!s) { return; }
+    if (s.pct > progTarget) { progTarget = s.pct; }
+    progStageKk = s.kk;
+    progStageRu = s.ru;
+    progStageShown = false;
+    renderProgStage();
+  }
+
+  function startProgress() {
+    progCur = 0;
+    progTarget = 0;
+    progStageShown = false;
+    els.progress.classList.remove("hidden");
+    progStage("prepare");
+    progRender();
+    progTimer = setInterval(progTick, 60);
+    progStageTimer = setInterval(swapProgStageLang, 5000);
+  }
+
+  function finishProgress() {
+    // Красивое завершение: доводим до 100% перед скрытием.
+    progTarget = 100;
+    progCur = 100;
+    progRender();
+  }
+
+  function stopProgress() {
+    if (progTimer) { clearInterval(progTimer); progTimer = null; }
+    if (progStageTimer) { clearInterval(progStageTimer); progStageTimer = null; }
+    els.progress.classList.add("hidden");
   }
 
   // --- Восстановление настроек ---
@@ -191,23 +297,30 @@
     patienceTimers = [];
   }
 
-  // Занято: прячем кнопку, показываем неоновый спиннер и цитаты.
+  // Занято: прячем кнопку, показываем неоновый спиннер, прогресс и цитаты.
   function setBusy(busy) {
-    els.run.disabled = busy;
-    els.run.classList.toggle("hidden", busy);
+    state.busy = busy;
     els.loader.classList.toggle("hidden", !busy);
+    refreshRunVisibility();
     if (busy) {
       setStatus("");
+      startProgress();
       startQuotes();
       startPatienceNotes();
     } else {
+      stopProgress();
       stopQuotes();
       stopPatienceNotes();
     }
   }
 
+  // Режим настроек: показываем панель настроек, прячем кнопку «Создать
+  // субтитры» и показываем подпись «powered by danik np» внизу.
   function toggleSettings() {
-    els.settingsPanel.classList.toggle("hidden");
+    state.settingsOpen = !state.settingsOpen;
+    els.settingsPanel.classList.toggle("hidden", !state.settingsOpen);
+    els.poweredBy.classList.toggle("hidden", !state.settingsOpen);
+    refreshRunVisibility();
   }
 
   function extensionRoot() {
@@ -261,7 +374,7 @@
     });
   }
 
-  function uploadForSrt(apiUrl, apiKey, filePath) {
+  function uploadForSrt(apiUrl, apiKey, filePath, onSent) {
     return new Promise(function (resolve, reject) {
       var u = parseUrl(apiUrl, "/transcribe");
       var boundary = "----kzsub" + Date.now().toString(16);
@@ -316,6 +429,10 @@
         reject(biErr("Байланыс жоқ. Кейінірек қайталап көріңіз.",
                      "Нет соединения. Повторите позже."));
       });
+      // 'finish' — тело запроса ушло в сокет: файл отправлен, дальше сервер
+      // распознаёт речь. Реальный «якорь» для перехода прогресса на этап
+      // распознавания (самый долгий, включая холодный старт GPU).
+      req.on("finish", function () { if (onSent) { onSent(); } });
       req.write(body);
       req.end();
     });
@@ -367,9 +484,9 @@
     var apiKey = els.apiKey.value.trim();
 
     if (!apiKey) {
-      els.settingsPanel.classList.remove("hidden");
-      return setStatus("Кілтіңізді енгізіңіз (⚙ баптаулар).", "error",
-                       "Введите ключ (⚙ настройки).");
+      // Ключа нет — открываем гейт активации (без ключа работа невозможна).
+      showActivation();
+      return;
     }
     if (!apiUrl) {
       return setStatus("Қате конфигурация. Панельді қайта ашыңыз.", "error",
@@ -380,18 +497,24 @@
 
     var presetPath = resolvePresetPath();
 
+    progStage("export");
     evalScript('kzsubExportSequenceAudio("' + esc(presetPath) + '")')
       .then(function (wavPath) {
         if (!wavPath || wavPath.indexOf("ERROR:") === 0) {
           throw new Error(wavPath || bi("Экспорт сәтсіз.", "Ошибка экспорта."));
         }
-        return uploadForSrt(apiUrl, apiKey, wavPath).then(function (srt) {
+        progStage("upload");
+        return uploadForSrt(apiUrl, apiKey, wavPath, function () {
+          progStage("recognize");
+        }).then(function (srt) {
           return { srt: srt, wavPath: wavPath };
         });
       })
       .then(function (r) {
+        progStage("build");
         var srtPath = path.join(os.tmpdir(), "kzsub_" + Date.now() + ".srt");
         fs.writeFileSync(srtPath, r.srt, "utf8");
+        progStage("importing");
         return evalScript('kzsubImportSrt("' + esc(srtPath) + '")').then(function (res) {
           try { fs.unlinkSync(r.wavPath); } catch (e) {}
           if (res && res.indexOf("ERROR:") === 0) { throw new Error(res); }
@@ -399,6 +522,7 @@
         });
       })
       .then(function (res) {
+        finishProgress();
         if (res === "INSERTED") {
           setStatus("Дайын! Субтитрлер таймлайнда.", "ok",
                     "Готово! Субтитры на таймлайне.");
@@ -417,9 +541,56 @@
       .then(function () { setBusy(false); });
   }
 
+  // --- Гейт активации (первый запуск) ------------------------------------
+  // Пока ключ не введён и не сохранён — основной интерфейс недоступен (экран
+  // активации перекрывает всё). После сохранения ключа гейт больше не
+  // показывается; сменить ключ можно только через Настройки.
+  function isActivated() {
+    try { return !!(localStorage.getItem("kzsub.apiKey") || "").trim(); }
+    catch (e) { return false; }
+  }
+
+  function showActivation() {
+    els.activationKey.value = els.apiKey.value || "";
+    els.activation.classList.remove("hidden");
+    setTimeout(function () { try { els.activationKey.focus(); } catch (e) {} }, 50);
+  }
+
+  function hideActivation() {
+    els.activation.classList.add("hidden");
+  }
+
+  function setActStatus(msg, isErr) {
+    els.activationStatus.textContent = msg || "";
+    els.activationStatus.className = "activation-status" + (isErr ? " error" : "");
+  }
+
+  function activate() {
+    var key = els.activationKey.value.trim();
+    if (!key) {
+      return setActStatus("Кілтіңізді енгізіңіз · Введите ключ", true);
+    }
+    // Сохраняем ключ в основное поле и localStorage — это и есть «активация».
+    // Валидность ключа проверяется сервером при первом создании субтитров
+    // (неверный ключ вернёт понятную ошибку 401).
+    els.apiKey.value = key;
+    saveSettings();
+    hideActivation();
+    setStatus("Қош келдіңіз! Дайынбыз.", "ok", "Добро пожаловать! Готово к работе.");
+  }
+
   els.run.addEventListener("click", runPipeline);
   els.test.addEventListener("click", onTest);
   els.pickPreset.addEventListener("click", onPickPreset);
   els.settingsToggle.addEventListener("click", toggleSettings);
   els.apiKey.addEventListener("change", saveSettings); // ключ сохраняется сразу
+  els.activationBtn.addEventListener("click", activate);
+  els.activationKey.addEventListener("keydown", function (e) {
+    if (e.keyCode === 13) { activate(); } // Enter — активировать
+  });
+
+  // Первый запуск: нет сохранённого ключа → показываем экран активации.
+  if (!isActivated()) {
+    showActivation();
+  }
 })();

@@ -117,9 +117,32 @@ body {
   align-items: center;
   justify-content: space-between;
 }
-.brand { display: flex; align-items: center; gap: 8px; }
-.ig-icon { color: #fff; flex: none; }
-.brand-name { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; color: #fff; }
+
+/* Выбор языка в шапке (слева) */
+.lang-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 6px 0 10px;
+  height: 34px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 160ms ease;
+}
+.lang-wrap:hover { border-color: var(--border-strong); }
+.lang-icon { color: var(--muted); flex: none; }
+.lang-select {
+  width: auto;
+  height: 30px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+}
+.lang-select:focus { box-shadow: none; border: none; }
 
 .top-actions { display: flex; align-items: center; gap: 8px; }
 
@@ -303,6 +326,45 @@ input[readonly] { color: var(--muted); cursor: default; }
 
 .quota { color: var(--faint); font-size: 11px; }
 
+/* ---------- Progress (этапы обработки) ---------- */
+.progress {
+  width: 100%;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.progress.hidden { display: none; }
+.progress-stage {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  min-height: 18px;
+}
+.progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--grad);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.7);
+  transition: width 160ms linear;
+}
+.progress-pct {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Fade-swap (мягкая смена текста через opacity) ---------- */
 .fade-swap { transition: opacity 320ms ease; opacity: 1; }
 .fade-swap.faded { opacity: 0; }
@@ -328,6 +390,56 @@ input[readonly] { color: var(--muted); cursor: default; }
   pointer-events: none;
 }
 .quote.hidden { display: none; }
+
+/* ---------- Powered by (в режиме настроек) ---------- */
+.powered {
+  text-align: center;
+  padding: 10px 0 2px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+}
+.powered.hidden { display: none; }
+
+/* ---------- Activation gate (первый запуск) ---------- */
+.activation {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(10, 10, 12, 0.92);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.activation.hidden { display: none; }
+.activation-card {
+  width: 100%;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+.activation-brand {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #fff;
+  text-shadow: 0 0 26px rgba(99, 102, 241, 0.6);
+  margin-bottom: 4px;
+}
+.activation-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.activation-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+.activation-input { text-align: center; margin-top: 4px; }
+.activation-btn { margin-top: 6px; height: 48px; }
+.activation-status { min-height: 16px; font-size: 12px; color: var(--muted); }
+.activation-status.error { color: var(--error); }
+.activation-hint { font-size: 11px; color: var(--faint); margin-top: 2px; }
 
 /* ---------- A11y ---------- */
 @media (prefers-reduced-motion: reduce) {
