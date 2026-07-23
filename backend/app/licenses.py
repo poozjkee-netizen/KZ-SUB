@@ -360,6 +360,19 @@ def list_licenses() -> list[License]:
 
 
 # --- Начальное наполнение (developer-ключ + опц. ключи из env) ---------------
+def _seed(**kwargs) -> None:
+    """Идемпотентный засев одной лицензии.
+
+    Молча игнорируем UNIQUE-гонку: uvicorn запускается с несколькими воркерами,
+    и каждый процесс выполняет ensure_seeded() на старте — без этого второй
+    воркер падал на `UNIQUE constraint failed`, роняя всё приложение.
+    """
+    try:
+        create_license(**kwargs)
+    except sqlite3.IntegrityError:
+        pass  # ключ уже создан другим воркером/ранее
+
+
 def ensure_seeded() -> None:
     """Готовит БД к работе: таблица + developer-ключ + бутстрап-ключи из env.
 
@@ -370,7 +383,7 @@ def ensure_seeded() -> None:
 
     dev = settings.developer_key.strip()
     if dev and get_license(dev) is None:
-        create_license(email="developer@np-sub", type=LicenseType.DEVELOPER, api_key=dev)
+        _seed(email="developer@np-sub", type=LicenseType.DEVELOPER, api_key=dev)
 
     # Бутстрап из KZSUB_API_KEYS="ключ:тариф,..." — для ключей, выданных вручную
     # до появления оплаты/кабинета. Идемпотентно: вставляем только отсутствующие.
@@ -387,11 +400,11 @@ def ensure_seeded() -> None:
         if not key or get_license(key) is not None:
             continue
         if tier == "free":
-            create_license(email="", type=LicenseType.TRIAL, api_key=key,
-                           total_minutes=settings.free_minutes_per_month)
+            _seed(email="", type=LicenseType.TRIAL, api_key=key,
+                  total_minutes=settings.free_minutes_per_month)
         else:
             # Легаси pro/studio — бессрочная безлимитная подписка (как раньше).
-            create_license(email="", type=LicenseType.SUBSCRIPTION, api_key=key)
+            _seed(email="", type=LicenseType.SUBSCRIPTION, api_key=key)
 
 
 # --- Мини-CLI для ручной выдачи ключей (ops до автоматизации оплаты) ---------

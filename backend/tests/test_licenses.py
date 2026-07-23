@@ -205,6 +205,23 @@ def test_no_default_test_keys():
         settings.developer_key, settings.api_keys = old_dev, old_keys
 
 
+def test_seed_is_race_safe():
+    _fresh()
+    licenses.create_license("", LicenseType.DEVELOPER, api_key="dupe")
+    # Повторный засев того же ключа (имитация второго воркера) НЕ падает.
+    licenses._seed(email="x", type=LicenseType.DEVELOPER, api_key="dupe")
+    assert len(licenses.list_licenses()) == 1
+    # ensure_seeded с уже существующим developer-ключом тоже не падает.
+    old = settings.developer_key
+    settings.developer_key = "dupe"
+    try:
+        licenses.ensure_seeded()
+        licenses.ensure_seeded()
+    finally:
+        settings.developer_key = old
+    assert len(licenses.list_licenses()) == 1
+
+
 def test_describe_is_readonly_and_accurate():
     _fresh()
     assert licenses.describe("missing") is None
