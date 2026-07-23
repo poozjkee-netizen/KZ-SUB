@@ -119,9 +119,12 @@ def _connect() -> sqlite3.Connection:
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
-    conn = sqlite3.connect(path)
+    # timeout — ждать освобождения блокировки, а не падать с "database is locked"
+    # при параллельных запросах (несколько потоков threadpool в одном воркере).
+    conn = sqlite3.connect(path, timeout=15)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")  # безопаснее при параллельных запросах
+    conn.execute("PRAGMA journal_mode=WAL")  # читатели не блокируют писателя
+    conn.execute("PRAGMA busy_timeout=15000")
     return conn
 
 
@@ -369,8 +372,8 @@ def _seed(**kwargs) -> None:
     """
     try:
         create_license(**kwargs)
-    except sqlite3.IntegrityError:
-        pass  # ключ уже создан другим воркером/ранее
+    except sqlite3.Error:
+        pass  # ключ уже создан другим воркером/ранее, либо гонка блокировки
 
 
 def ensure_seeded() -> None:
