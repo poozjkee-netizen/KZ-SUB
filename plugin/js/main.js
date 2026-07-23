@@ -49,6 +49,7 @@
     runContent: document.getElementById("runContent"),
     quote: document.getElementById("quote"),
     poweredBy: document.getElementById("poweredBy"),
+    langWrap: document.querySelector(".lang-wrap"),
     // Прогресс
     progress: document.getElementById("progress"),
     progressStage: document.getElementById("progressStage"),
@@ -314,12 +315,15 @@
     }
   }
 
-  // Режим настроек: показываем панель настроек, прячем кнопку «Создать
-  // субтитры» и показываем подпись «powered by danik np» внизу.
+  // Режим настроек: чистый экран — только поле ключа и подпись «powered by
+  // danik np». Прячем кнопку «Создать субтитры», выбор языка и остаточный
+  // статус (например, зелёное «Готово» от прошлого прогона).
   function toggleSettings() {
     state.settingsOpen = !state.settingsOpen;
     els.settingsPanel.classList.toggle("hidden", !state.settingsOpen);
     els.poweredBy.classList.toggle("hidden", !state.settingsOpen);
+    els.langWrap.classList.toggle("hidden", state.settingsOpen);
+    if (state.settingsOpen) { setStatus(""); } // убрать остаточный статус
     refreshRunVisibility();
   }
 

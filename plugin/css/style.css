@@ -131,6 +131,7 @@ body {
   transition: border-color 160ms ease;
 }
 .lang-wrap:hover { border-color: var(--border-strong); }
+.lang-wrap.hidden { display: none; }
 .lang-icon { color: var(--muted); flex: none; }
 .lang-select {
   width: auto;
