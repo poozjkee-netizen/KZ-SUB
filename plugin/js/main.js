@@ -382,6 +382,58 @@
     });
   }
 
+  // Проверка лицензии по ключу (GET /license). Резолвит состояние лицензии
+  // {active, status, type, remaining_minutes}; реджектит ierr при 401/сети.
+  function checkLicense(apiUrl, apiKey) {
+    return new Promise(function (resolve, reject) {
+      var u = parseUrl(apiUrl, "/license");
+      var opts = u.options;
+      opts.method = "GET";
+      opts.headers = { "X-API-Key": apiKey };
+      var req = u.lib.request(opts, function (res) {
+        var chunks = [];
+        res.on("data", function (c) { chunks.push(c); });
+        res.on("end", function () {
+          var text = Buffer.concat(chunks).toString("utf8");
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            try { resolve(JSON.parse(text)); }
+            catch (e) { reject(ierr("test.badResponse")); }
+          } else if (res.statusCode === 401) {
+            reject(ierr("test.keyInvalid"));
+          } else {
+            reject(ierr("err.server", { code: res.statusCode }));
+          }
+        });
+      });
+      req.setTimeout(HEALTH_TIMEOUT_MS, function () { req.destroy(ierr("err.timeout")); });
+      req.on("error", function () { reject(ierr("err.noConnection")); });
+      req.end();
+    });
+  }
+
+  // Сообщение по статусу неактивной лицензии.
+  function licenseStateMsg(status) {
+    if (status === "expired") { return t("test.keyExpired"); }
+    if (status === "exhausted") { return t("test.keyExhausted"); }
+    if (status === "suspended" || status === "revoked") { return t("test.keySuspended"); }
+    return t("test.keyInvalid");
+  }
+
+  // Показать результат проверки лицензии в заданный сеттер статуса.
+  function applyLicenseInfo(info, setOk, setErr) {
+    if (info.active) {
+      var rem = info.remaining_minutes;
+      if (rem === null || rem === undefined) {
+        setOk(t("test.keyValidUnlimited"));
+      } else {
+        setOk(t("test.keyValid", { minutes: Math.floor(rem) }));
+      }
+      return true;
+    }
+    setErr(licenseStateMsg(info.status));
+    return false;
+  }
+
   function uploadForSrt(apiUrl, apiKey, filePath, onSent) {
     return new Promise(function (resolve, reject) {
       var u = parseUrl(apiUrl, "/transcribe");
@@ -448,18 +500,26 @@
 
   function onTest() {
     var apiUrl = els.apiUrl.value.trim();
+    var apiKey = els.apiKey.value.trim();
     if (!apiUrl) {
       return setStatus(t("test.noUrl"), "error");
+    }
+    if (!apiKey) {
+      return setStatus(t("activation.enterKey"), "error");
     }
     saveSettings();
     els.test.disabled = true;
     setStatus(t("test.checking"));
-    checkHealth(apiUrl)
+    checkLicense(apiUrl, apiKey)
       .then(function (info) {
-        setStatus(t("test.ready", { model: info.model || "?" }), "ok");
+        applyLicenseInfo(
+          info,
+          function (m) { setStatus(m, "ok"); },
+          function (m) { setStatus(m, "error"); }
+        );
       })
       .catch(function (err) {
-        setStatus(t("test.noConnection", { detail: errText(err) }), "error");
+        setStatus(errText(err), "error");
       })
       .then(function () { els.test.disabled = false; });
   }
@@ -563,12 +623,30 @@
     if (!key) {
       return setActStatus(t("activation.enterKey"), true);
     }
-    // Сохраняем ключ — это и есть «активация». Валидность проверяется сервером
-    // при первом создании субтитров (неверный ключ вернёт понятную ошибку 401).
-    els.apiKey.value = key;
-    saveSettings();
-    hideActivation();
-    setStatus(t("welcome"), "ok");
+    var apiUrl = els.apiUrl.value.trim();
+    els.activationBtn.disabled = true;
+    setActStatus(t("test.checking"));
+    // Проверяем ключ на сервере ДО входа: неверный/заблокированный/просроченный
+    // ключ не пускает в интерфейс (раньше пускал, а ошибка всплывала только при
+    // создании субтитров). При сетевой ошибке тоже не входим — просим повторить.
+    checkLicense(apiUrl, key)
+      .then(function (info) {
+        var ok = applyLicenseInfo(
+          info,
+          function () {
+            els.apiKey.value = key;
+            saveSettings();
+            hideActivation();
+            setStatus(t("welcome"), "ok");
+          },
+          function (m) { setActStatus(m, true); }
+        );
+        return ok;
+      })
+      .catch(function (err) {
+        setActStatus(errText(err), true);
+      })
+      .then(function () { els.activationBtn.disabled = false; });
   }
 
   // --- Смена языка интерфейса --------------------------------------------

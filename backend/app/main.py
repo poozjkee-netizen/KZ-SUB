@@ -43,6 +43,22 @@ def health() -> dict:
     return {"status": "ok", "model": settings.whisper_model, "language": settings.language}
 
 
+@app.get("/license")
+def license_info(
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+) -> dict:
+    """Статус лицензии по ключу (для кнопки «Проверить» и будущего кабинета).
+
+    Read-only: не меняет статус и не привязывает устройства. 401 — ключа нет.
+    """
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="Требуется заголовок X-API-Key")
+    info = licenses.describe(x_api_key)
+    if info is None:
+        raise HTTPException(status_code=401, detail="Неизвестный ключ")
+    return info
+
+
 @app.post("/transcribe")
 async def transcribe(
     file: UploadFile = File(...),

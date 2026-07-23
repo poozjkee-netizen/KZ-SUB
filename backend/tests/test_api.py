@@ -96,6 +96,15 @@ def test_invalid_key_rejected(client):
     assert r.status_code == 401  # неизвестный ключ -> InvalidKey -> 401
 
 
+def test_license_endpoint(client):
+    """GET /license: 401 на неизвестный ключ, состояние на валидный."""
+    r = client.get("/license", headers={"X-API-Key": "nope"})
+    assert r.status_code == 401
+    r = client.get("/license", headers={"X-API-Key": "dev-key"})
+    assert r.status_code == 200
+    assert r.json()["active"] is True
+
+
 def test_exhausted_key_is_402(client):
     """Лицензия без остатка минут -> 402."""
     licenses.create_license("x@test", licenses.LicenseType.MINUTE_PACK,

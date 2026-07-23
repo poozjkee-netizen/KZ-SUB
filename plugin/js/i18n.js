@@ -69,9 +69,14 @@ var I18N = (function () {
       // Проверка сервера (кнопка «Проверить»)
       "test.noUrl": "Укажите адрес сервера.",
       "test.checking": "Проверка…",
-      "test.ready": "Сервер готов · {model}",
       "test.noConnection": "Нет соединения: {detail}",
       "test.badResponse": "Непонятный ответ сервера",
+      "test.keyValid": "Ключ активен · осталось {minutes} мин",
+      "test.keyValidUnlimited": "Ключ активен · безлимит",
+      "test.keyInvalid": "Неверный ключ. Напишите в поддержку.",
+      "test.keyExpired": "Срок ключа истёк. Обновите подписку.",
+      "test.keyExhausted": "Лимит минут исчерпан. Обновите подписку.",
+      "test.keySuspended": "Ключ заблокирован. Напишите в поддержку.",
 
       "preset.saved": "Пресет сохранён.",
 
@@ -150,9 +155,14 @@ var I18N = (function () {
 
       "test.noUrl": "Сервер адресін көрсетіңіз.",
       "test.checking": "Тексерілуде…",
-      "test.ready": "Сервер дайын · {model}",
       "test.noConnection": "Байланыс жоқ: {detail}",
       "test.badResponse": "Сервер жауабы түсініксіз",
+      "test.keyValid": "Кілт белсенді · {minutes} мин қалды",
+      "test.keyValidUnlimited": "Кілт белсенді · шексіз",
+      "test.keyInvalid": "Кілт жарамсыз. Қолдау қызметіне жазыңыз.",
+      "test.keyExpired": "Кілттің мерзімі бітті. Жазылымды жаңартыңыз.",
+      "test.keyExhausted": "Минут лимиті таусылды. Жазылымды жаңартыңыз.",
+      "test.keySuspended": "Кілт бұғатталған. Қолдау қызметіне жазыңыз.",
 
       "preset.saved": "Пресет сақталды.",
 

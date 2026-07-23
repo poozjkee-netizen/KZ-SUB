@@ -325,6 +325,34 @@ def change_plan(
         )
 
 
+def describe(api_key: str) -> dict | None:
+    """Состояние лицензии БЕЗ побочных эффектов (для эндпоинта /license и кабинета).
+
+    Возвращает None, если ключа нет. Иначе — dict с active/status/type/остатком,
+    не меняя статус в БД (в отличие от check_license, который его фиксирует).
+    """
+    lic = get_license(api_key)
+    if lic is None:
+        return None
+    active = True
+    status = lic.status
+    if lic.type == LicenseType.DEVELOPER:
+        active, status = True, LicenseStatus.ACTIVE
+    elif lic.status in (LicenseStatus.SUSPENDED, LicenseStatus.REVOKED):
+        active = False
+    elif lic.expires_at is not None and time.time() > lic.expires_at:
+        active, status = False, LicenseStatus.EXPIRED
+    elif lic.total_minutes is not None and lic.used_minutes >= lic.total_minutes:
+        active, status = False, LicenseStatus.EXHAUSTED
+    return {
+        "active": active,
+        "status": status,
+        "type": lic.type,
+        "remaining_minutes": lic.remaining_minutes(),
+        "expires_at": lic.expires_at,
+    }
+
+
 def list_licenses() -> list[License]:
     with _lock, _connect() as conn:
         rows = conn.execute("SELECT * FROM licenses ORDER BY created_at DESC").fetchall()

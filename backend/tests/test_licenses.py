@@ -205,6 +205,30 @@ def test_no_default_test_keys():
         settings.developer_key, settings.api_keys = old_dev, old_keys
 
 
+def test_describe_is_readonly_and_accurate():
+    _fresh()
+    assert licenses.describe("missing") is None
+
+    licenses.create_license("", LicenseType.SUBSCRIPTION, total_minutes=100, api_key="ok")
+    d = licenses.describe("ok")
+    assert d["active"] is True
+    assert d["remaining_minutes"] == 100
+
+    licenses.create_license("", LicenseType.MINUTE_PACK, total_minutes=5, api_key="ex")
+    licenses.commit_usage("ex", 5)
+    d = licenses.describe("ex")
+    assert d["active"] is False and d["status"] == LicenseStatus.EXHAUSTED
+
+    licenses.create_license("", LicenseType.DEVELOPER, api_key="dv")
+    assert licenses.describe("dv")["active"] is True
+
+    # describe НЕ мутирует статус (в отличие от check_license)
+    licenses.create_license("", LicenseType.SUBSCRIPTION, total_minutes=100,
+                            days=-1, api_key="expd")
+    assert licenses.describe("expd")["active"] is False
+    assert licenses.get_license("expd").status == LicenseStatus.ACTIVE
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):
