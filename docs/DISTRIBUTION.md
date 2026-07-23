@@ -57,7 +57,7 @@ ZXPSIGNCMD=~/bin/ZXPSignCmd bash scripts/build-zxp.sh
 
 ## Часть 2. Инструкция для клиента (даёшь вместе с файлом)
 
-**Что нужно:** файл `NP-SUB.zxp` и ключ активации (выдаёшь ты).
+**Что нужно:** файл `NP-SUB-<версия>.zxp` (например `NP-SUB-1.2.0.zxp`) и ключ активации (выдаёшь ты).
 
 > Один и тот же `.zxp` ставится и на **macOS**, и на **Windows** — файл
 > кроссплатформенный, переподписывать под Windows не нужно.
@@ -65,7 +65,7 @@ ZXPSIGNCMD=~/bin/ZXPSignCmd bash scripts/build-zxp.sh
 ### Установка (macOS/Windows)
 1. Скачать бесплатный установщик расширений:
    **ZXP/UXP Installer** (aescripts) или **Anastasiy's Extension Manager**.
-2. Перетащить в него файл `NP-SUB.zxp` → **Install**. Он сам разложит панель и
+2. Перетащить в него файл `NP-SUB-<версия>.zxp` → **Install**. Он сам разложит панель и
    разрешит самоподписанное расширение.
 3. Полностью перезапустить Premiere Pro.
 4. **Window → Extensions → NP SUB**.
@@ -77,14 +77,39 @@ ZXPSIGNCMD=~/bin/ZXPSignCmd bash scripts/build-zxp.sh
 
 ---
 
-## Выдача ключей клиентам
-Ключ активации = запись в `KZSUB_API_KEYS` на шлюзе (Fly). Добавить нового
-клиента:
+## Ручные продажи через Kaspi + выдача ключей
+
+Цикл продажи (пока без автоматизации оплаты — самый реалистичный старт для KZ):
+
+1. **Клиент оплачивает на Kaspi** (перевод/QR) по цене тарифа.
+   Цены/минуты — в каталоге: `python -m app.licenses plans`.
+2. **Ты выдаёшь ключ по тарифу** (в консоли шлюза):
+   ```bash
+   fly ssh console
+   cd /app
+   python -m app.licenses create --email client@mail --plan starter
+   ```
+   Скопируй выданный `api_key` (`kzsub_…`).
+3. **Отправь клиенту:** ключ + файл `NP-SUB-<версия>.zxp` + инструкцию из «Часть 2».
+
+### Управление лицензиями
 ```bash
-cd ~/kz-sub/backend
-fly secrets set KZSUB_API_KEYS="client-1-xxxx:pro,client-2-yyyy:pro,trial-zzz:free"
+python -m app.licenses list                       # все ключи + остаток минут/срок
+python -m app.licenses topup <ключ> --minutes 100 # добить минут (доплата)
+python -m app.licenses renew <ключ> --days 30     # продлить подписку (сброс минут)
+python -m app.licenses revoke <ключ>              # отозвать (возврат/абьюз)
+python -m app.licenses delete <ключ>              # удалить навсегда
 ```
-(перечисляешь ВСЕ активные ключи через запятую; `:free` — с лимитом минут,
-`:pro` — без лимита на уровне шлюза). Каждый ключ работает максимум на
-`KZSUB_MAX_DEVICES_PER_KEY` устройствах (по умолчанию 2) — защита от передачи
-ключа посторонним.
+
+Каждый ключ работает максимум на `KZSUB_MAX_DEVICES_PER_KEY` устройствах
+(по умолчанию 2) — защита от передачи ключа посторонним.
+
+> Тарифы задаются в `backend/app/plans.py` (единый источник, синхрон с
+> `docs/MONETIZATION.md`) — меняешь цену/минуты там.
+> Легаси `KZSUB_API_KEYS` ещё работает как бутстрап (заносится в БД при старте),
+> но основной путь выдачи — CLI выше.
+
+### Автоматизация (когда поток вырастет)
+Шов готов: `licenses.create_from_plan(email, plan)`. Останется подключить
+провайдера (вебхук оплаты / Telegram-бот) — он вызовет эту функцию после платежа.
+См. «Задел под будущее» в `docs/MONETIZATION.md`.
