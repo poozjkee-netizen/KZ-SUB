@@ -10,11 +10,11 @@ import logging
 import os
 import uuid
 
-from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
-from . import licenses
+from . import licenses, telegram_bot
 from .config import settings
 from .devices import DeviceLimitError, check_device
 from .licenses import LicenseError
@@ -57,6 +57,25 @@ def license_info(
     if info is None:
         raise HTTPException(status_code=401, detail="Неизвестный ключ")
     return info
+
+
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request) -> dict:
+    """Вебхук Telegram-бота выдачи ключей (app/telegram_bot.py).
+
+    404, если бот не настроен (KZSUB_TELEGRAM_BOT_TOKEN пуст) — эндпоинт не
+    существует в проде, пока владелец явно не включит бота. 401, если задан
+    KZSUB_TELEGRAM_WEBHOOK_SECRET и заголовок не совпадает (регистрируется
+    через `python -m app.telegram_bot set-webhook`).
+    """
+    if not settings.telegram_bot_token:
+        raise HTTPException(status_code=404)
+    secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if settings.telegram_webhook_secret and secret != settings.telegram_webhook_secret:
+        raise HTTPException(status_code=401)
+    update = await request.json()
+    await run_in_threadpool(telegram_bot.handle_update, update)
+    return {"ok": True}
 
 
 @app.post("/transcribe")

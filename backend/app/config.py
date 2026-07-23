@@ -123,5 +123,21 @@ class Settings:
     # восклицательные знаки остаются).
     punct_keep: str = _get("PUNCT_KEEP", "!")
 
+    # --- Telegram-бот выдачи ключей (app/telegram_bot.py) ---
+    # Токен бота от @BotFather. Пусто = вебхук /telegram/webhook отключён (404).
+    telegram_bot_token: str = _get("TELEGRAM_BOT_TOKEN", "")
+
+    # Секрет вебхука (задаётся при `python -m app.telegram_bot set-webhook`,
+    # сверяется с заголовком X-Telegram-Bot-Api-Secret-Token). Пусто = заголовок
+    # не проверяется — небезопасно, задавай в проде.
+    telegram_webhook_secret: str = _get("TELEGRAM_WEBHOOK_SECRET", "")
+
+    # Telegram ID продавца(ов), кто подтверждает оплату Standard, через запятую.
+    # Свой ID узнать командой /whoami у бота.
+    telegram_admin_ids: str = _get("TELEGRAM_ADMIN_IDS", "")
+
+    # Номер/реквизит Kaspi для оплаты — показывается клиенту в /buy.
+    kaspi_phone: str = _get("KASPI_PHONE", "")
+
 
 settings = Settings()

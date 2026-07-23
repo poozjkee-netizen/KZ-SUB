@@ -395,6 +395,20 @@ def list_licenses() -> list[License]:
     return [_row_to_license(r) for r in rows]
 
 
+def find_by_email(email: str, type_: str | None = None) -> License | None:
+    """Первая лицензия с таким email (опц. фильтр по типу).
+
+    Используется ботом выдачи (Telegram): email хранит "tg:<id>", чтобы не
+    выдавать второй demo-ключ тому же аккаунту и переиспользовать уже
+    выданный standard при повторном подтверждении оплаты. Без индекса по
+    email — полный скан ок при нынешнем объёме (ручная/полу-авто выдача).
+    """
+    for lic in list_licenses():
+        if lic.email == email and (type_ is None or lic.type == type_):
+            return lic
+    return None
+
+
 # --- Начальное наполнение (developer-ключ + опц. ключи из env) ---------------
 def _seed(**kwargs) -> None:
     """Идемпотентный засев одной лицензии.

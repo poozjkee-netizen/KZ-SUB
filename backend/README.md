@@ -63,6 +63,10 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_MAX_LINES`             | `2`          | макс. строк в реплике               |
 | `KZSUB_MAX_CUE_SECONDS`       | `7.0`        | макс. длительность реплики          |
 | `KZSUB_MAX_GAP_SECONDS`       | `0.8`        | пауза для разрыва реплики           |
+| `KZSUB_TELEGRAM_BOT_TOKEN`    | (пусто)      | токен бота (@BotFather); пусто = вебхук отключён (404) |
+| `KZSUB_TELEGRAM_WEBHOOK_SECRET`| (пусто)     | секрет вебхука (заголовок `X-Telegram-Bot-Api-Secret-Token`) |
+| `KZSUB_TELEGRAM_ADMIN_IDS`    | (пусто)      | Telegram ID продавца(ов) через запятую — подтверждают оплату |
+| `KZSUB_KASPI_PHONE`           | (пусто)      | реквизит Kaspi, который бот показывает в `/buy` |
 
 ## Тесты
 ```bash
@@ -98,8 +102,29 @@ python -m app.licenses delete <api_key>                   # удалить на�
 python -m app.licenses purge-revoked                      # снести все отозванные
 ```
 
+## Telegram-бот выдачи ключей (app/telegram_bot.py)
+Demo (3 мин) выдаётся автоматически, один раз на Telegram-аккаунт. Standard
+(60 мин/30 дней) — полу-авто: клиент жмёт «Я оплатил» после перевода на Kaspi,
+заявка с кнопками Подтвердить/Отклонить уходит продавцу (`KZSUB_TELEGRAM_ADMIN_IDS`);
+после подтверждения бот сам создаёт лицензию и присылает ключ клиенту. Kaspi не
+даёт публичного API для авто-проверки перевода, поэтому решение — за человеком.
+
+Настройка (см. также `.env.example`):
+```bash
+fly secrets set KZSUB_TELEGRAM_BOT_TOKEN=<токен от @BotFather>
+fly secrets set KZSUB_TELEGRAM_WEBHOOK_SECRET=<случайная строка>
+fly secrets set KZSUB_TELEGRAM_ADMIN_IDS=<твой Telegram ID>   # узнать: /whoami у бота
+fly secrets set KZSUB_KASPI_PHONE="<номер/реквизит Kaspi>"
+fly deploy --remote-only
+python -m app.telegram_bot set-webhook https://kzsub-gateway.fly.dev/telegram/webhook
+```
+`python -m app.telegram_bot webhook-info` — проверить регистрацию;
+`delete-webhook` — снять (например, для локальной отладки long-polling).
+
 ## Что здесь заглушка (доработать для прода)
-- **Оплата** — ключи выдаются вручную через CLI. Нужен вебхук Kaspi/Stripe → авто-создание лицензий.
+- **Оплата** — Standard выдаётся полу-авто через Telegram-бота (см. выше) или
+  вручную через CLI. Полностью авто (без участия продавца) упирается в
+  отсутствие публичного API проверки платежа у Kaspi.
 - **Регистрация/кабинет** — задел в `licenses.py` есть (поля email/статусы/остаток), UI и эндпоинты — впереди.
 - **Хранение аудио** — временный файл на диске. Для масштаба — объектное хранилище + очередь.
 - **Масштаб БД** — SQLite на томе (один инстанс). При мультирегионе — Postgres (интерфейс модуля тот же).
