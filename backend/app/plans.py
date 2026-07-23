@@ -30,7 +30,7 @@ class Plan:
 # у типа SUBSCRIPTION работают независимо, без отдельного механизма).
 PLANS: dict[str, Plan] = {
     "demo":     Plan("demo",     "Demo",     LicenseType.TRIAL,          3, None,  0,    0),
-    "standard": Plan("standard", "Standard", LicenseType.SUBSCRIPTION,  60,   30,  5, 2490),
+    "standard": Plan("standard", "Standard", LicenseType.SUBSCRIPTION,  60,   30,  3, 1490),
 }
 
 ALL: dict[str, Plan] = {**PLANS}
