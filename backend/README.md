@@ -40,7 +40,8 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
      "http://localhost:8000/transcribe?fmt=json"
 ```
 
-Коды ответа: `401` нет ключа · `402` квота исчерпана · `413` файл слишком длинный · `500` ошибка транскрибации.
+Коды ответа: `401` нет/неизвестный ключ · `402` истёк срок или лимит минут · `403` заблокирован/лимит устройств · `413` файл слишком длинный · `500` ошибка транскрибации.
+Ответ несёт заголовок `X-Minutes-Remaining` (остаток минут или `unlimited`).
 
 ## Конфигурация (env, префикс `KZSUB_`)
 | Переменная                    | По умолчанию | Назначение                          |
@@ -48,8 +49,10 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_WHISPER_MODEL`         | `large-v3`   | модель Whisper                      |
 | `KZSUB_DEVICE`                | `cpu`        | `cpu` / `cuda`                      |
 | `KZSUB_COMPUTE_TYPE`          | `int8`       | тип вычислений                      |
-| `KZSUB_API_KEYS`              | (пусто→dev)  | `ключ:тариф,...` — свои ключи на проде |
-| `KZSUB_FREE_MINUTES_PER_MONTH`| `30`         | бесплатный лимит                    |
+| `KZSUB_DEVELOPER_KEY`         | (пусто)      | бессрочный безлимитный ключ разработчика (Fly secret) |
+| `KZSUB_API_KEYS`              | (пусто)      | бутстрап-ключи `ключ:тариф,...` → заносятся в БД лицензий |
+| `KZSUB_LICENSE_DB`            | (пусто)      | путь к БД лицензий (пусто = `STATE_DIR/licenses.db`) |
+| `KZSUB_FREE_MINUTES_PER_MONTH`| `30`         | лимит минут для бутстрап-ключей `:free` |
 | `KZSUB_MAX_AUDIO_SECONDS`     | `5400`       | лимит длительности файла            |
 | `KZSUB_CAPTION_STYLE`         | `word`       | `word` (караоке, по слову) / `phrase` (фразы) |
 | `KZSUB_GLUE_MAX_CHARS`        | `2`          | в режиме `word`: короткие слова липнут к следующему |
@@ -65,15 +68,29 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 ```bash
 # Без тяжёлых зависимостей (чистая логика):
 python tests/test_srt.py
-python tests/test_quota.py
+python tests/test_licenses.py
 python tests/test_segmentation.py
+python tests/test_style.py
+python tests/test_devices.py
 
 # Интеграционный тест HTTP-контракта /transcribe (нужен fastapi/httpx,
 # модель Whisper замокана — GPU/веса не требуются):
 pytest tests/test_api.py
 ```
 
+## Лицензии (app/licenses.py)
+Постоянное хранилище лицензий на SQLite (том Fly). Типы: `developer` (безлимит),
+`trial` (по времени), `subscription` (30 дней + минуты), `minute_pack` (минуты),
+`lifetime`. При каждом запросе проверяются существование ключа, статус, срок и
+лимит минут. Выдача ключей вручную (до автоматизации оплаты):
+```bash
+python -m app.licenses create --email user@mail --type subscription --minutes 300 --days 30
+python -m app.licenses list
+python -m app.licenses topup <api_key> --minutes 100
+```
+
 ## Что здесь заглушка (доработать для прода)
-- **`app/quota.py`** — учёт в памяти процесса. Заменить на БД + биллинг.
-- **Аутентификация** — статичный словарь ключей. Нужны реальные пользователи/токены.
+- **Оплата** — ключи выдаются вручную через CLI. Нужен вебхук Kaspi/Stripe → авто-создание лицензий.
+- **Регистрация/кабинет** — задел в `licenses.py` есть (поля email/статусы/остаток), UI и эндпоинты — впереди.
 - **Хранение аудио** — временный файл на диске. Для масштаба — объектное хранилище + очередь.
+- **Масштаб БД** — SQLite на томе (один инстанс). При мультирегионе — Postgres (интерфейс модуля тот же).

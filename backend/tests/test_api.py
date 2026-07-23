@@ -1,8 +1,8 @@
 """Интеграционный тест эндпоинта /transcribe.
 
 Проверяет HTTP-контракт, который использует панель: multipart-загрузка ->
-проверка ключа/квоты -> .srt (или JSON). Сама модель Whisper замокана, чтобы
-тест был быстрым и не требовал GPU/весов.
+проверка лицензии/минут -> .srt (или JSON). Сама модель Whisper замокана,
+чтобы тест был быстрым и не требовал GPU/весов.
 
 Требует установленных fastapi/httpx (см. requirements.txt). Без них — пропуск.
 Запуск: pytest backend/tests/test_api.py
@@ -17,14 +17,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app import main, quota  # noqa: E402
+from app import licenses, main  # noqa: E402
 from app.asr_types import RawSegment, Word  # noqa: E402
 
 
 @pytest.fixture
-def client(monkeypatch):
+def client(monkeypatch, tmp_path):
     from app import devices
-    quota._usage.clear()
+    # Свежая БД лицензий на временном файле + валидный ключ "dev-key"
+    # (developer-лицензия: без лимитов, чтобы тесты контракта не упирались в квоты).
+    licenses.configure(str(tmp_path / "lic.db"))
+    licenses.init_db()
+    licenses.create_license("dev@test", licenses.LicenseType.DEVELOPER, api_key="dev-key")
     devices._bindings.clear()
     devices._loaded = True  # не читать состояние с диска в тестах
 
@@ -89,7 +93,24 @@ def test_transcribe_json_format(client):
 
 def test_invalid_key_rejected(client):
     r = client.post("/transcribe", files=_audio_file(), headers=_headers(key="bogus"))
-    assert r.status_code == 402  # QuotaError -> 402
+    assert r.status_code == 401  # неизвестный ключ -> InvalidKey -> 401
+
+
+def test_exhausted_key_is_402(client):
+    """Лицензия без остатка минут -> 402."""
+    licenses.create_license("x@test", licenses.LicenseType.MINUTE_PACK,
+                            total_minutes=0.0, api_key="empty-key")
+    r = client.post("/transcribe", files=_audio_file(), headers=_headers(key="empty-key"))
+    assert r.status_code == 402
+
+
+def test_minutes_remaining_header(client):
+    """Ответ несёт остаток минут (для баланса в панели/кабинете)."""
+    licenses.create_license("y@test", licenses.LicenseType.SUBSCRIPTION,
+                            total_minutes=100, api_key="lim-key")
+    r = client.post("/transcribe", files=_audio_file(), headers=_headers(key="lim-key"))
+    assert r.status_code == 200
+    assert "X-Minutes-Remaining" in r.headers
 
 
 def test_device_limit_enforced(client, monkeypatch):

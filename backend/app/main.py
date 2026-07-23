@@ -14,9 +14,10 @@ from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
+from . import licenses
 from .config import settings
 from .devices import DeviceLimitError, check_device
-from .quota import QuotaError, check_and_reserve, commit
+from .licenses import LicenseError
 from .runpod_client import RunpodError, transcribe_via_runpod
 from .segmentation import resegment, resegment_words
 from .srt import Segment, segments_to_srt
@@ -29,6 +30,12 @@ logger = logging.getLogger("kzsub.api")
 app = FastAPI(title="KZ-SUB API", version="0.1.0")
 
 os.makedirs(settings.tmp_dir, exist_ok=True)
+
+
+@app.on_event("startup")
+def _startup() -> None:
+    # Готовим БД лицензий: таблица + developer-ключ + бутстрап-ключи из env.
+    licenses.ensure_seeded()
 
 
 @app.get("/health")
@@ -45,6 +52,13 @@ async def transcribe(
 ):
     if not x_api_key:
         raise HTTPException(status_code=401, detail="Требуется заголовок X-API-Key")
+
+    # Лицензия: существование ключа, статус, срок действия — ДО привязки
+    # устройства и чтения файла (не биндим устройства к несуществующим ключам).
+    try:
+        licenses.check_license(x_api_key, 0.0)
+    except LicenseError as e:
+        raise HTTPException(status_code=e.http_status, detail=str(e))
 
     # Анти-шаринг: ключ работает максимум на N устройствах.
     try:
@@ -68,10 +82,11 @@ async def transcribe(
         if estimated_seconds > settings.max_audio_seconds:
             raise HTTPException(status_code=413, detail="Слишком длинный файл")
 
+        # Лимит минут: хватит ли остатка лицензии на этот файл.
         try:
-            check_and_reserve(x_api_key, estimated_seconds)
-        except QuotaError as e:
-            raise HTTPException(status_code=402, detail=str(e))
+            licenses.check_license(x_api_key, estimated_seconds / 60.0)
+        except LicenseError as e:
+            raise HTTPException(status_code=e.http_status, detail=str(e))
 
         proxy_mode = bool(settings.runpod_endpoint_id and settings.runpod_api_key)
 
@@ -120,7 +135,16 @@ async def transcribe(
                 punct_keep=settings.punct_keep,
             )
 
-        commit(x_api_key, duration or estimated_seconds)
+        # Списываем фактически обработанные минуты.
+        licenses.commit_usage(x_api_key, (duration or estimated_seconds) / 60.0)
+
+        # Остаток минут — в заголовок ответа (задел под отображение баланса
+        # в панели/кабинете). "unlimited" для безлимитных лицензий.
+        lic_after = licenses.get_license(x_api_key)
+        remaining = lic_after.remaining_minutes() if lic_after else None
+        headers = {
+            "X-Minutes-Remaining": "unlimited" if remaining is None else str(int(remaining))
+        }
 
         if fmt == "json":
             return JSONResponse(
@@ -131,9 +155,14 @@ async def transcribe(
                         {"start": s.start, "end": s.end, "text": s.text.strip()}
                         for s in segments
                     ],
-                }
+                },
+                headers=headers,
             )
-        return PlainTextResponse(segments_to_srt(segments), media_type="application/x-subrip")
+        return PlainTextResponse(
+            segments_to_srt(segments),
+            media_type="application/x-subrip",
+            headers=headers,
+        )
     finally:
         try:
             os.remove(tmp_path)

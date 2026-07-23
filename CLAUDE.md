@@ -74,10 +74,10 @@
   [`docs/DECISIONS.md`](docs/DECISIONS.md)). Любое изменение — с явной причиной.
 - **Меняй минимально необходимое.** Точечные правки предпочтительнее «больших уборок».
 - **Уважай два режима бэкенда** — правка не должна ломать ни локальный, ни прокси.
-- **Core-логика без тяжёлых зависимостей.** Модули `srt.py`, `quota.py`,
+- **Core-логика без тяжёлых зависимостей.** Модули `srt.py`, `licenses.py`,
   `segmentation.py`, `style.py`, `devices.py`, `config.py` **не должны** импортировать
   `fastapi`/`faster_whisper` на уровне модуля (Whisper — лениво внутри функций).
-  Это держит их dep-free-тестируемыми.
+  Это держит их dep-free-тестируемыми (`licenses.py` использует только stdlib `sqlite3`).
 - **Конфиг — только через `config.py`** и префикс `KZSUB_`. Новую настройку
   добавляй туда + в `backend/.env.example` + в таблицу `backend/README.md`.
 - **Панель: не ломай контракт с бэкендом.** Заголовки `X-API-Key`, `X-Device-Id`,
@@ -129,7 +129,7 @@
 
 - **Env-переменные:** `KZSUB_<ИМЯ>` (см. `config.py`). Не заводи конфиг мимо этого.
 - **Python:** модули и функции `snake_case`, классы `CamelCase`. Модуль = одна зона
-  ответственности (`quota`, `devices`, `segmentation`, `style`, `srt`, `transcribe`,
+  ответственности (`licenses`, `devices`, `segmentation`, `style`, `srt`, `transcribe`,
   `runpod_client`).
 - **Инфра-идентификаторы фиксированы:** `kzsub-gateway` (Fly), `kzsub-runpod`
   (Docker), `kz.kzsub.panel` (bundle id), `kzsub_data` (том), `gateway-internal`
@@ -150,7 +150,7 @@
 ## 11. Требования к тестированию
 
 - **Два класса тестов** в `backend/tests/`:
-  - **dep-free** (`test_srt`, `test_quota`, `test_segmentation`, `test_style`,
+  - **dep-free** (`test_srt`, `test_licenses`, `test_segmentation`, `test_style`,
     `test_devices`) — запускаются без тяжёлых пакетов: `python tests/test_x.py`.
     Любая новая core-логика обязана иметь такой тест.
   - **интеграционные** (`test_api`) — HTTP-контракт `/transcribe` с замоканной
@@ -186,7 +186,7 @@
 
 ```bash
 # Тесты (dep-free — без установки тяжёлых пакетов)
-cd backend && python tests/test_srt.py && python tests/test_quota.py \
+cd backend && python tests/test_srt.py && python tests/test_licenses.py \
   && python tests/test_segmentation.py && python tests/test_style.py \
   && python tests/test_devices.py
 

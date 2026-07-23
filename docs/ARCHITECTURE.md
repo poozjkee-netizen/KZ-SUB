@@ -12,7 +12,7 @@ Premiere Pro
         │  2. main.js: multipart POST аудио → API
         ▼
 NP SUB API (FastAPI)
-        │  3. quota.py: проверка ключа/лимита
+        │  3. licenses.py: проверка лицензии (ключ/статус/срок/лимит минут)
         │  4. transcribe.py: faster-whisper (kk) → сегменты + пословные тайм-коды
         │  5. segmentation.py: нарезка в аккуратные реплики (длина/время/паузы)
         │  6. srt.py: сегменты → .srt

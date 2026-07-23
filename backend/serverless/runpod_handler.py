@@ -24,7 +24,6 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.config import settings  # noqa: E402
-from app.quota import QuotaError, check_and_reserve, commit  # noqa: E402
 from app.segmentation import resegment, resegment_words  # noqa: E402
 from app.srt import segments_to_srt  # noqa: E402
 from app.style import apply_style  # noqa: E402
@@ -34,9 +33,11 @@ from app.transcribe import _get_model, transcribe_file  # noqa: E402
 def handler(job: dict) -> dict:
     inp = job.get("input") or {}
 
+    # Лицензии/квоты проверяет ШЛЮЗ (у него БД). Воркер лишь убеждается, что
+    # запрос пришёл от нашего шлюза (внутренний ключ), и транскрибирует.
     api_key = (inp.get("api_key") or "").strip()
-    if not api_key:
-        return {"error": "api_key required"}
+    if api_key != settings.runpod_worker_key:
+        return {"error": "unauthorized"}
 
     audio_b64 = inp.get("audio_base64")
     if not audio_b64:
@@ -50,10 +51,6 @@ def handler(job: dict) -> dict:
     estimated_seconds = max(1.0, len(audio) / (1 << 20) * 60)
     if estimated_seconds > settings.max_audio_seconds:
         return {"error": "audio too long"}
-    try:
-        check_and_reserve(api_key, estimated_seconds)
-    except QuotaError as e:
-        return {"error": f"quota: {e}"}
 
     tmp_path = None
     try:
@@ -79,8 +76,6 @@ def handler(job: dict) -> dict:
             strip_punctuation=settings.strip_punctuation,
             punct_keep=settings.punct_keep,
         )
-
-        commit(api_key, duration or estimated_seconds)
 
         if (inp.get("fmt") or "srt") == "json":
             return {
