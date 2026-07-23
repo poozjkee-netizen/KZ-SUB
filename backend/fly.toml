@@ -26,4 +26,4 @@ primary_region = "fra"   # Франкфурт — ближайший крупн�
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "512mb"
+  memory = "1024mb"   # 512mb OOM-убивало uvicorn на файлах ~28 МБ (см. CHANGELOG)

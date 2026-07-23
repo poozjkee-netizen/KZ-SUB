@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
 from . import licenses, telegram_bot
+from .audio_probe import probe_duration_seconds
 from .config import settings
 from .devices import DeviceLimitError, check_device
 from .licenses import LicenseError
@@ -111,9 +112,9 @@ async def transcribe(
     logger.info("Принят файл %s (%d байт)", tmp_path, size)
 
     try:
-        # Грубая оценка длительности для предварительной проверки квоты
-        # (уточним по факту после транскрибации). ~1 МБ ≈ 60 сек сжатого аудио.
-        estimated_seconds = max(1.0, size / (1 << 20) * 60)
+        # Длительность для предварительной проверки лимита/квоты (уточним по
+        # факту после транскрибации) — точно из заголовка WAV, см. audio_probe.py.
+        estimated_seconds = probe_duration_seconds(tmp_path, size)
         if estimated_seconds > settings.max_audio_seconds:
             raise HTTPException(status_code=413, detail="Слишком длинный файл")
 

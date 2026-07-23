@@ -45,8 +45,9 @@ class Settings:
     # Бесплатная квота (минуты аудио в месяц) для ключей без подписки.
     free_minutes_per_month: int = _get_int("FREE_MINUTES_PER_MONTH", 30)
 
-    # Максимальная длительность одного файла (сек), защита от абьюза.
-    max_audio_seconds: int = _get_int("MAX_AUDIO_SECONDS", 60 * 90)  # 1.5 часа
+    # Максимальная длительность одного файла (сек), защита от абьюза и от
+    # OOM на шлюзе (весь файл + base64-копия держатся в памяти прокси-режима).
+    max_audio_seconds: int = _get_int("MAX_AUDIO_SECONDS", 60 * 10)  # 10 минут
 
     # Директория для временных файлов.
     tmp_dir: str = _get("TMP_DIR", "tmp")
