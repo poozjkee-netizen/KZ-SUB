@@ -222,6 +222,23 @@ def test_seed_is_race_safe():
     assert len(licenses.list_licenses()) == 1
 
 
+def test_delete_and_purge_revoked():
+    _fresh()
+    licenses.create_license("", LicenseType.SUBSCRIPTION, api_key="a")
+    licenses.create_license("", LicenseType.SUBSCRIPTION, api_key="b")
+    licenses.create_license("", LicenseType.SUBSCRIPTION, api_key="c")
+    licenses.revoke("b")
+    licenses.revoke("c")
+    assert licenses.delete_license("a") is True
+    assert licenses.delete_license("missing") is False
+    assert licenses.get_license("a") is None
+    n = licenses.purge_revoked()
+    assert n == 2
+    assert licenses.get_license("b") is None
+    assert licenses.get_license("c") is None
+    assert licenses.list_licenses() == []
+
+
 def test_describe_is_readonly_and_accurate():
     _fresh()
     assert licenses.describe("missing") is None

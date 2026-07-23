@@ -311,6 +311,22 @@ def topup(api_key: str, minutes: float) -> None:
         )
 
 
+def delete_license(api_key: str) -> bool:
+    """Удаляет лицензию НАВСЕГДА из БД. True — если что-то удалено."""
+    with _lock, _connect() as conn:
+        cur = conn.execute("DELETE FROM licenses WHERE api_key = ?", (api_key,))
+        return cur.rowcount > 0
+
+
+def purge_revoked() -> int:
+    """Удаляет ВСЕ отозванные (revoked) лицензии. Возвращает число удалённых."""
+    with _lock, _connect() as conn:
+        cur = conn.execute(
+            "DELETE FROM licenses WHERE status = ?", (LicenseStatus.REVOKED,)
+        )
+        return cur.rowcount
+
+
 def change_plan(
     api_key: str, type: str, total_minutes: float | None = None,
     days: int | None = None,
@@ -431,6 +447,11 @@ def _main() -> None:
         s = sub.add_parser(name, help=f"{name} лицензию")
         s.add_argument("api_key")
 
+    dl = sub.add_parser("delete", help="удалить лицензию НАВСЕГДА")
+    dl.add_argument("api_key")
+
+    sub.add_parser("purge-revoked", help="удалить ВСЕ отозванные лицензии")
+
     r = sub.add_parser("renew", help="продлить подписку")
     r.add_argument("api_key")
     r.add_argument("--days", type=int, default=30)
@@ -463,6 +484,12 @@ def _main() -> None:
                      "suspend": LicenseStatus.SUSPENDED,
                      "activate": LicenseStatus.ACTIVE}[args.cmd])
         print(f"{args.cmd}: {args.api_key}")
+    elif args.cmd == "delete":
+        ok = delete_license(args.api_key)
+        print(("удалено: " if ok else "не найдено: ") + args.api_key)
+    elif args.cmd == "purge-revoked":
+        n = purge_revoked()
+        print(f"удалено отозванных лицензий: {n}")
     elif args.cmd == "renew":
         renew(args.api_key, args.days)
         print(f"продлено на {args.days} дн.: {args.api_key}")
