@@ -77,7 +77,8 @@ $19 / 9 490 ₸ (себестоимость ~$1 и ~$5 → прибыль +$4 и
 Ложится на ту же модель лицензий без её изменения:
 - **Регистрация:** `POST /register {email}` → `trial`-лицензия, ключ на почту.
 - **Личный кабинет:** `GET /account` → `type/expires_at/used/total/remaining/status`.
-- **Оплата:** вебхук Kaspi/Stripe → `create_license`/`renew`/`topup` (идемпотентно по payment_id).
+- **Оплата:** вебхук Kaspi/Stripe → `licenses.create_from_plan(email, plan)` (тарифы
+  в `app/plans.py` — единый источник; шов уже есть, остаётся подключить провайдера).
 - **Смена тарифа:** `change_plan(...)` (апгрейд/даунгрейд).
 - **Остаток минут:** уже отдаётся заголовком `X-Minutes-Remaining`; панель покажет баланс.
 

@@ -129,8 +129,8 @@
 
 - **Env-переменные:** `KZSUB_<ИМЯ>` (см. `config.py`). Не заводи конфиг мимо этого.
 - **Python:** модули и функции `snake_case`, классы `CamelCase`. Модуль = одна зона
-  ответственности (`licenses`, `devices`, `segmentation`, `style`, `srt`, `transcribe`,
-  `runpod_client`).
+  ответственности (`licenses`, `plans`, `devices`, `segmentation`, `style`, `srt`,
+  `transcribe`, `runpod_client`).
 - **Инфра-идентификаторы фиксированы:** `kzsub-gateway` (Fly), `kzsub-runpod`
   (Docker), `kz.kzsub.panel` (bundle id), `kzsub_data` (том), `gateway-internal`
   (внутренний ключ воркера). Менять — только осознанно и синхронно везде.

@@ -222,6 +222,30 @@ def test_seed_is_race_safe():
     assert len(licenses.list_licenses()) == 1
 
 
+def test_create_from_plan():
+    _fresh()
+    from app import plans
+
+    lic = licenses.create_from_plan("u@x", "starter", api_key="pk")
+    assert lic.type == LicenseType.SUBSCRIPTION
+    assert lic.total_minutes == 60
+    assert lic.expires_at is not None            # подписка на 30 дней
+
+    f = licenses.create_from_plan("", "free", api_key="fk")
+    assert f.type == LicenseType.TRIAL
+    assert f.total_minutes == 3 and f.expires_at is None
+
+    try:
+        licenses.create_from_plan("", "nope")
+        assert False, "ожидался ValueError на неизвестный тариф"
+    except ValueError:
+        pass
+
+    # Каталог: регистронезависимый доступ и полнота
+    assert plans.get_plan("PRO").minutes == 1200
+    assert {"free", "starter", "creator", "pro", "studio"}.issubset(set(plans.plan_names()))
+
+
 def test_delete_and_purge_revoked():
     _fresh()
     licenses.create_license("", LicenseType.SUBSCRIPTION, api_key="a")

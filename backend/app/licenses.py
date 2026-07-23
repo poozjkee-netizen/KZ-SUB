@@ -213,6 +213,23 @@ def create_license(
     return lic
 
 
+def create_from_plan(email: str, plan_name: str, api_key: str | None = None) -> License:
+    """Выдаёт лицензию по тарифу из каталога plans.py (минуты/срок/тип оттуда).
+
+    Это шов для будущего вебхука оплаты: платёж по тарифу → create_from_plan.
+    Импорт plans локальный — plans зависит от licenses (LicenseType), не наоборот.
+    """
+    from .plans import get_plan  # локально: избегаем кругового импорта
+
+    plan = get_plan(plan_name)
+    if plan is None:
+        raise ValueError(f"Неизвестный тариф: {plan_name}")
+    return create_license(
+        email=email, type=plan.license_type,
+        total_minutes=plan.minutes, days=plan.days, api_key=api_key,
+    )
+
+
 def check_license(api_key: str, estimated_minutes: float = 0.0) -> License:
     """Проверка при каждом запросе: существование, статус, срок, лимит минут.
 
@@ -436,12 +453,15 @@ def _main() -> None:
 
     c = sub.add_parser("create", help="создать лицензию")
     c.add_argument("--email", default="")
-    c.add_argument("--type", required=True, choices=sorted(LicenseType.ALL))
+    c.add_argument("--plan", default=None, help="тариф из каталога (см. команду plans)")
+    c.add_argument("--type", default=None, choices=sorted(LicenseType.ALL),
+                   help="или вручную: тип лицензии (если без --plan)")
     c.add_argument("--minutes", type=float, default=None, help="лимит минут (пусто = безлимит)")
     c.add_argument("--days", type=int, default=None, help="срок в днях (пусто = бессрочно)")
     c.add_argument("--key", default=None, help="задать ключ вручную (иначе сгенерируется)")
 
     sub.add_parser("list", help="список лицензий")
+    sub.add_parser("plans", help="показать каталог тарифов")
 
     for name in ("revoke", "suspend", "activate"):
         s = sub.add_parser(name, help=f"{name} лицензию")
@@ -467,12 +487,24 @@ def _main() -> None:
         return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d") if ts else "—"
 
     if args.cmd == "create":
-        lic = create_license(args.email, args.type, args.minutes, args.days, args.key)
+        if args.plan:
+            lic = create_from_plan(args.email, args.plan, args.key)
+        elif args.type:
+            lic = create_license(args.email, args.type, args.minutes, args.days, args.key)
+        else:
+            p.error("нужен --plan <тариф> или --type <тип>")
         print("Создана лицензия:")
         print("  api_key :", lic.api_key)
         print("  type    :", lic.type)
         print("  minutes :", "∞" if lic.total_minutes is None else lic.total_minutes)
         print("  expires :", fmt_ts(lic.expires_at))
+    elif args.cmd == "plans":
+        from .plans import ALL as _PLANS
+        for pl in _PLANS.values():
+            mins = "∞" if pl.minutes is None else int(pl.minutes)
+            days = "бессрочно" if pl.days is None else f"{pl.days} дн."
+            print(f"{pl.name:9} {pl.title:14} мин={mins:<5} {days:11} "
+                  f"${pl.price_usd:<3g} / {pl.price_kzt}₸  [{pl.license_type}]")
     elif args.cmd == "list":
         for lic in list_licenses():
             rem = "∞" if lic.remaining_minutes() is None else f"{lic.remaining_minutes():.0f}"
