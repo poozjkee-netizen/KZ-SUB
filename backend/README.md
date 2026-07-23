@@ -80,14 +80,17 @@ pytest tests/test_api.py
 
 ## Лицензии (app/licenses.py)
 Постоянное хранилище лицензий на SQLite (том Fly). Типы: `developer` (безлимит),
-`trial` (по времени), `subscription` (30 дней + минуты), `minute_pack` (минуты),
-`lifetime`. При каждом запросе проверяются существование ключа, статус, срок и
-лимит минут. Тарифы — в `app/plans.py` (единый источник, синхрон с MONETIZATION).
+`trial` (по времени), `subscription` (30 дней + минуты); `minute_pack`/`lifetime`
+реализованы, но пока не используются в тарифной сетке. При каждом запросе
+проверяются существование ключа, статус, срок и лимит минут — оба лимита
+(минуты и срок) у `subscription` независимы. Тарифы — в `app/plans.py` (единый
+источник, синхрон с MONETIZATION): единственный платный тариф **standard**
+(60 мин или 30 дней, что раньше) + бесплатный **demo** (3 мин, без срока).
 
 Выдача ключей вручную (до автоматизации оплаты):
 ```bash
 python -m app.licenses plans                              # каталог тарифов
-python -m app.licenses create --email user@mail --plan starter   # выдать по тарифу
+python -m app.licenses create --email user@mail --plan standard  # выдать по тарифу
 python -m app.licenses list
 python -m app.licenses topup <api_key> --minutes 100
 python -m app.licenses revoke <api_key>                   # пометить отозванной

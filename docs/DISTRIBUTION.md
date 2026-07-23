@@ -81,13 +81,14 @@ ZXPSIGNCMD=~/bin/ZXPSignCmd bash scripts/build-zxp.sh
 
 Цикл продажи (пока без автоматизации оплаты — самый реалистичный старт для KZ):
 
-1. **Клиент оплачивает на Kaspi** (перевод/QR) по цене тарифа.
-   Цены/минуты — в каталоге: `python -m app.licenses plans`.
-2. **Ты выдаёшь ключ по тарифу** (в консоли шлюза):
+1. **Клиент оплачивает на Kaspi** (перевод/QR) — единственный платный тариф
+   **Standard**: $5 / 2 490 ₸, 60 минут или 30 дней (что раньше). Каталог:
+   `python -m app.licenses plans`.
+2. **Ты выдаёшь ключ** (в консоли шлюза):
    ```bash
    fly ssh console
    cd /app
-   python -m app.licenses create --email client@mail --plan starter
+   python -m app.licenses create --email client@mail --plan standard
    ```
    Скопируй выданный `api_key` (`kzsub_…`).
 3. **Отправь клиенту:** ключ + файл `NP-SUB-<версия>.zxp` + инструкцию из «Часть 2».

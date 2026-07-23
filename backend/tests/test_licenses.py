@@ -226,12 +226,12 @@ def test_create_from_plan():
     _fresh()
     from app import plans
 
-    lic = licenses.create_from_plan("u@x", "starter", api_key="pk")
+    lic = licenses.create_from_plan("u@x", "standard", api_key="pk")
     assert lic.type == LicenseType.SUBSCRIPTION
     assert lic.total_minutes == 60
     assert lic.expires_at is not None            # подписка на 30 дней
 
-    f = licenses.create_from_plan("", "free", api_key="fk")
+    f = licenses.create_from_plan("", "demo", api_key="fk")
     assert f.type == LicenseType.TRIAL
     assert f.total_minutes == 3 and f.expires_at is None
 
@@ -241,9 +241,9 @@ def test_create_from_plan():
     except ValueError:
         pass
 
-    # Каталог: регистронезависимый доступ и полнота
-    assert plans.get_plan("PRO").minutes == 1200
-    assert {"free", "starter", "creator", "pro", "studio"}.issubset(set(plans.plan_names()))
+    # Каталог: регистронезависимый доступ, единственный платный тариф
+    assert plans.get_plan("STANDARD").minutes == 60
+    assert set(plans.plan_names()) == {"demo", "standard"}
 
 
 def test_delete_and_purge_revoked():

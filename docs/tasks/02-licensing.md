@@ -16,10 +16,17 @@
 
 Реализовано в `backend/app/licenses.py` (SQLite на томе Fly, stdlib-only,
 dep-free-тестируемо) + каталог тарифов `backend/app/plans.py`. Типы:
-developer/trial/subscription/minute_pack/lifetime. Статусы:
+developer/trial/subscription/minute_pack/lifetime (последние два — в коде, но
+не используются в текущей сетке). Статусы:
 active/expired/exhausted/suspended/revoked. Ответ несёт `X-Minutes-Remaining`.
 Экономика и тарифы — в [MONETIZATION.md](../MONETIZATION.md), выдача — в
 [DISTRIBUTION.md](../DISTRIBUTION.md).
+
+**Тарифная сетка упрощена перед запуском до двух пунктов:** `demo` (TRIAL, 3
+мин, без срока) и `standard` (SUBSCRIPTION, 60 мин **или** 30 дней — что
+раньше; лимиты независимы, механизм уже был в `check_license`, тут только
+упрощение каталога). Убраны Creator/Pro/Studio и Minute Pack — при росте
+спроса сетку можно расширить обратно, добавив записи в `plans.py`.
 
 ## Подзадачи
 
@@ -28,6 +35,7 @@ active/expired/exhausted/suspended/revoked. Ответ несёт `X-Minutes-Rem
 - [x] Developer-ключ (обходит проверки) через `KZSUB_DEVELOPER_KEY`
 - [x] CLI: create/list/plans/topup/renew/revoke/suspend/activate/delete/purge-revoked
 - [x] Каталог тарифов `plans.py` как единый источник + `create_from_plan`
+- [x] Упрощение сетки до единственного платного тарифа `standard` (60 мин/30 дней) + бесплатного `demo` (3 мин)
 - [x] `GET /license` — read-only статус ключа
 - [x] Удалены тестовые ключи (`dev-key`/`free-demo`); БД в проде чистая
 - [x] Гонка засева при мультиворкере устранена (один воркер + busy_timeout)
@@ -52,3 +60,4 @@ active/expired/exhausted/suspended/revoked. Ответ несёт `X-Minutes-Rem
 ## История
 
 - 2026-07-23 — Задача выделена из STATUS.md (§4, §5, §6). Базовая система в проде; отмечены остаточные пункты (овередж, change_plan, register).
+- 2026-07-23 — Тарифная сетка упрощена до единственного платного тарифа `standard` (60 мин/30 дней) + `demo` (3 мин) перед первыми продажами. Убраны Creator/Pro/Studio и Minute Pack из `plans.py`; тесты и доки обновлены.

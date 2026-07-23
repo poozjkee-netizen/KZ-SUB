@@ -15,7 +15,7 @@ from .licenses import LicenseType
 
 @dataclass(frozen=True)
 class Plan:
-    name: str               # ключ каталога (starter/creator/...)
+    name: str               # ключ каталога (demo/standard)
     title: str              # человекочитаемое имя
     license_type: str       # тип лицензии (LicenseType.*)
     minutes: float | None   # включённые минуты (None = безлимит)
@@ -24,22 +24,16 @@ class Plan:
     price_kzt: int
 
 
-# Тарифная сетка (см. docs/MONETIZATION.md). Подписки — 30 дней.
+# Тарифная сетка (см. docs/MONETIZATION.md) — единственный платный тариф.
+# Standard ограничен ОБОИМИ условиями сразу: 60 минут ИЛИ 30 дней, что
+# наступит раньше (эту развилку уже проверяет check_license — оба лимита
+# у типа SUBSCRIPTION работают независимо, без отдельного механизма).
 PLANS: dict[str, Plan] = {
-    "free":    Plan("free",    "Free",    LicenseType.TRIAL,           3, None,  0,     0),
-    "starter": Plan("starter", "Starter", LicenseType.SUBSCRIPTION,   60,   30,  5,  2490),
-    "creator": Plan("creator", "Creator", LicenseType.SUBSCRIPTION,  300,   30, 12,  5990),
-    "pro":     Plan("pro",     "Pro",     LicenseType.SUBSCRIPTION, 1200,   30, 29, 14900),
-    "studio":  Plan("studio",  "Studio",  LicenseType.SUBSCRIPTION, 3600,   30, 59, 29900),
+    "demo":     Plan("demo",     "Demo",     LicenseType.TRIAL,          3, None,  0,    0),
+    "standard": Plan("standard", "Standard", LicenseType.SUBSCRIPTION,  60,   30,  5, 2490),
 }
 
-# Разовые пакеты минут (без подписки) — тоже единый источник.
-MINUTE_PACKS: dict[str, Plan] = {
-    "pack120": Plan("pack120", "Пакет 120 мин", LicenseType.MINUTE_PACK, 120, None,  5, 2490),
-    "pack600": Plan("pack600", "Пакет 600 мин", LicenseType.MINUTE_PACK, 600, None, 19, 9490),
-}
-
-ALL: dict[str, Plan] = {**PLANS, **MINUTE_PACKS}
+ALL: dict[str, Plan] = {**PLANS}
 
 
 def get_plan(name: str) -> Plan | None:
