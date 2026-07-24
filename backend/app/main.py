@@ -15,11 +15,12 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
 from . import licenses, telegram_bot
+from .audio_convert import to_16k_mono_wav_bytes
 from .audio_probe import probe_duration_seconds
 from .config import settings
 from .devices import DeviceLimitError, check_device
 from .licenses import LicenseError
-from .runpod_client import RunpodError, transcribe_via_runpod
+from .runpod_client import AudioTooLarge, RunpodError, transcribe_via_runpod
 from .segmentation import resegment, resegment_words
 from .srt import Segment, segments_to_srt
 from .style import apply_style
@@ -129,10 +130,14 @@ async def transcribe(
         if proxy_mode:
             # Прокси-режим: тяжёлая работа на Runpod GPU. Воркер возвращает уже
             # нарезанные и оформленные сегменты (общий код в runpod_handler).
-            with open(tmp_path, "rb") as f:
-                audio_bytes = f.read()
+            # Конвертируем в 16 kHz mono: панель шлёт 48 kHz stereo (~6× больше),
+            # и после base64 тело превышало бы лимит Runpod 10 MiB (см. audio_convert).
+            audio_bytes = await run_in_threadpool(to_16k_mono_wav_bytes, tmp_path)
             try:
                 out = await run_in_threadpool(transcribe_via_runpod, audio_bytes, "json")
+            except AudioTooLarge as e:
+                logger.warning("Аудио слишком большое: %s", e)
+                raise HTTPException(status_code=413, detail=str(e))
             except RunpodError as e:
                 logger.error("Runpod: %s", e)
                 raise HTTPException(status_code=502, detail="Сервис транскрибации недоступен")

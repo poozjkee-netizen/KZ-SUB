@@ -23,6 +23,15 @@ class RunpodError(Exception):
     """Ошибка вызова Runpod (конфигурация, сеть, упавшее задание)."""
 
 
+class AudioTooLarge(RunpodError):
+    """Аудио (после base64) не влезает в лимит тела Runpod /run (10 MiB)."""
+
+
+# Лимит тела запроса Runpod /run. Оставляем запас на JSON-обёртку и заголовки.
+RUNPOD_MAX_BODY_BYTES = 10 * 1024 * 1024
+_BODY_SAFETY_BYTES = 64 * 1024
+
+
 def _request(url: str, payload: dict | None = None) -> dict:
     headers = {
         "Authorization": f"Bearer {settings.runpod_api_key}",
@@ -51,10 +60,21 @@ def transcribe_via_runpod(audio_bytes: bytes, fmt: str = "json") -> dict:
         raise RunpodError("Runpod не сконфигурирован (KZSUB_RUNPOD_ENDPOINT_ID/API_KEY)")
 
     base = f"https://api.runpod.ai/v2/{settings.runpod_endpoint_id}"
+    audio_b64 = base64.b64encode(audio_bytes).decode()
+
+    # Отсекаем заранее: Runpod вернёт 400 "exceeded max body size of 10MiB",
+    # а мы дадим клиенту понятную причину (слишком длинный/тяжёлый файл).
+    if len(audio_b64) + _BODY_SAFETY_BYTES > RUNPOD_MAX_BODY_BYTES:
+        raise AudioTooLarge(
+            "Аудио слишком большое для обработки одним запросом "
+            f"({len(audio_b64) // (1024 * 1024)} МБ после кодирования, лимит 10 МБ). "
+            "Сократите длительность ролика."
+        )
+
     payload = {
         "input": {
             "api_key": settings.runpod_worker_key,
-            "audio_base64": base64.b64encode(audio_bytes).decode(),
+            "audio_base64": audio_b64,
             "fmt": fmt,
         }
     }
