@@ -170,6 +170,38 @@ def test_proxy_mode_returns_srt(client, monkeypatch):
     assert "00:00:01,000 --> 00:00:02,000" in r.text
 
 
+def test_proxy_mode_merges_chunks_with_offset(client, monkeypatch):
+    """Длинное аудио режется на куски; сегменты склеиваются со сдвигом тайм-кодов."""
+    from app.config import settings as cfg
+
+    monkeypatch.setattr(cfg, "runpod_endpoint_id", "ep123")
+    monkeypatch.setattr(cfg, "runpod_api_key", "rp_secret")
+
+    # Две части со смещениями 0 и 5 секунд (реальную нарезку подменяем).
+    monkeypatch.setattr(
+        main, "split_wav_for_runpod",
+        lambda wav, cs, *a, **k: [(b"chunkA", 0.0), (b"chunkB", 5.0)],
+    )
+
+    calls = []
+
+    def fake_runpod(audio_bytes, fmt="json"):
+        calls.append(audio_bytes)
+        # Каждый кусок отдаёт сегмент в ЛОКАЛЬНОМ времени куска (0.0–1.0).
+        return {"duration": 1.0,
+                "segments": [{"start": 0.0, "end": 1.0, "text": "ЧАНК"}]}
+
+    monkeypatch.setattr(main, "transcribe_via_runpod", fake_runpod)
+
+    r = client.post("/transcribe?fmt=json", files=_audio_file(), headers=_headers())
+    assert r.status_code == 200
+    segs = r.json()["segments"]
+    assert len(segs) == 2
+    assert segs[0]["start"] == 0.0        # первый кусок — без сдвига
+    assert segs[1]["start"] == 5.0        # второй кусок — сдвинут на своё смещение
+    assert len(calls) == 2                # оба куска ушли в Runpod
+
+
 def test_proxy_mode_runpod_error_is_502(client, monkeypatch):
     from app.config import settings as cfg
     from app.runpod_client import RunpodError

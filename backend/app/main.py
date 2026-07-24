@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
 from . import licenses, telegram_bot
+from .audio_chunk import split_wav_for_runpod
 from .audio_convert import to_16k_mono_wav_bytes
 from .audio_probe import probe_duration_seconds
 from .config import settings
@@ -32,6 +33,31 @@ logger = logging.getLogger("kzsub.api")
 app = FastAPI(title="KZ-SUB API", version="0.1.0")
 
 os.makedirs(settings.tmp_dir, exist_ok=True)
+
+
+def _runpod_transcribe(tmp_path: str, total_duration: float) -> tuple[list[Segment], float]:
+    """Прокси-режим: конвертирует, при нужде режет на куски и склеивает сегменты.
+
+    Синхронная (urllib внутри) — вызывается через run_in_threadpool одним заходом,
+    чтобы весь цикл нарезки шёл вне event loop. Куски гонятся последовательно
+    (эндпоинт остаётся тёплым между ними). Тайм-коды сегментов каждого куска
+    сдвигаются на смещение куска в исходном аудио. total_duration — реальная
+    длительность файла (из probe), используется для списания минут.
+    """
+    wav_bytes = to_16k_mono_wav_bytes(tmp_path)
+    chunks = split_wav_for_runpod(wav_bytes, settings.chunk_seconds)
+
+    segments: list[Segment] = []
+    for chunk_bytes, offset in chunks:
+        out = transcribe_via_runpod(chunk_bytes, "json")
+        for s in (out.get("segments") or []):
+            segments.append(Segment(
+                float(s["start"]) + offset, float(s["end"]) + offset, str(s["text"])
+            ))
+
+    if len(chunks) > 1:
+        logger.info("Склеено %d сегментов из %d кусков", len(segments), len(chunks))
+    return segments, total_duration
 
 
 @app.on_event("startup")
@@ -130,22 +156,19 @@ async def transcribe(
         if proxy_mode:
             # Прокси-режим: тяжёлая работа на Runpod GPU. Воркер возвращает уже
             # нарезанные и оформленные сегменты (общий код в runpod_handler).
-            # Конвертируем в 16 kHz mono: панель шлёт 48 kHz stereo (~6× больше),
-            # и после base64 тело превышало бы лимит Runpod 10 MiB (см. audio_convert).
-            audio_bytes = await run_in_threadpool(to_16k_mono_wav_bytes, tmp_path)
+            # Аудио конвертируется в 16 kHz mono и при нужде режется на куски —
+            # панель шлёт 48 kHz stereo, а у Runpod лимит 10 MiB на запрос
+            # (см. audio_convert / audio_chunk).
             try:
-                out = await run_in_threadpool(transcribe_via_runpod, audio_bytes, "json")
+                segments, duration = await run_in_threadpool(
+                    _runpod_transcribe, tmp_path, estimated_seconds
+                )
             except AudioTooLarge as e:
                 logger.warning("Аудио слишком большое: %s", e)
                 raise HTTPException(status_code=413, detail=str(e))
             except RunpodError as e:
                 logger.error("Runpod: %s", e)
                 raise HTTPException(status_code=502, detail="Сервис транскрибации недоступен")
-            segments = [
-                Segment(float(s["start"]), float(s["end"]), str(s["text"]))
-                for s in (out.get("segments") or [])
-            ]
-            duration = float(out.get("duration") or 0.0)
         else:
             # Локальный режим: Whisper на этой машине.
             try:
