@@ -44,6 +44,11 @@ _Изменения, ещё не вошедшие в подписанную `.zx
   заголовка WAV (`app/audio_probe.py`, stdlib `wave`).
 - [Проект] `docs/DISTRIBUTION.md`: runbook ручных продаж через Kaspi (оплата →
   `create --plan` → выдача ключа) и управление лицензиями; имя `.zxp` с версией.
+- [Панель] **Установщик одним кликом для клиентов** (`scripts/dist-installer/`):
+  Windows `.bat` + macOS `.command` сами кладут панель в папку расширений и
+  включают `PlayerDebugMode` (CEP 9–13) — без ZXP Installer и без ручной правки
+  реестра. `build-zxp.sh` собирает готовый `dist/NP-SUB-<версия>-installer.zip`
+  рядом с `.zxp`. Обходит частую ошибку ZXP Installer `-193` на Windows.
 
 ## [1.2.0] — 2026-07-23
 

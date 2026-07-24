@@ -71,6 +71,26 @@ if [ "$signed" -eq 0 ]; then
   "$SIGN" -sign "$PLUGIN" "$ZXP" "$CERT" "$CERT_PASS"
 fi
 
+# 3. Установщик-«одним-кликом» для клиентов (Windows .bat + macOS .command).
+# Ставит панель без ZXP Installer и без ручной правки реестра — самый
+# надёжный путь установки для нетехнических пользователей (см. DISTRIBUTION.md).
+echo "==> Собираю установщик для клиентов…"
+STAGE="$DIST/NP-SUB-$VERSION-installer"
+INSTALLER_ZIP="$DIST/NP-SUB-$VERSION-installer.zip"
+rm -rf "$STAGE" "$INSTALLER_ZIP"
+mkdir -p "$STAGE/NP-SUB"
+# Копируем файлы панели, исключая dev-only .debug (удалённая отладка CEF).
+cp -R "$PLUGIN/." "$STAGE/NP-SUB/"
+rm -f "$STAGE/NP-SUB/.debug"
+cp "$SCRIPT_DIR/dist-installer/install-windows.bat" "$STAGE/"
+cp "$SCRIPT_DIR/dist-installer/install-macos.command" "$STAGE/"
+cp "$SCRIPT_DIR/dist-installer/README.txt" "$STAGE/"
+chmod +x "$STAGE/install-macos.command"
+( cd "$DIST" && zip -r -q "NP-SUB-$VERSION-installer.zip" "NP-SUB-$VERSION-installer" )
+rm -rf "$STAGE"
+
 echo ""
-echo "Готово: $ZXP"
-echo "Раздавай пользователям этот файл + инструкцию из docs/DISTRIBUTION.md"
+echo "Готово:"
+echo "  $ZXP"
+echo "  $INSTALLER_ZIP   (установщик одним кликом — рекомендуется клиентам)"
+echo "Раздавай пользователям + инструкцию из docs/DISTRIBUTION.md"

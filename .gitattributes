@@ -1,0 +1,5 @@
+# Windows batch-файлы должны иметь CRLF, иначе могут неправильно исполняться.
+*.bat text eol=crlf
+# Скрипты для macOS/Linux — всегда LF.
+*.command text eol=lf
+*.sh text eol=lf
