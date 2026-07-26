@@ -4,6 +4,7 @@
 """
 import io
 import os
+import struct
 import sys
 import tempfile
 import wave
@@ -55,6 +56,51 @@ def test_already_16k_mono_passthrough():
     out = to_16k_mono_wav_bytes(path)
     ch, width, rate, _ = _read_wav_params(out)
     assert (ch, width, rate) == (1, 2, 16000)
+
+
+def _make_tone_wav(freq_hz, seconds, rate, channels=1):
+    """WAV с синусоидой заданной частоты — для проверки антиалиасинга."""
+    import math
+    path = os.path.join(_tmpdir, f"tone_{freq_hz}_{rate}_{channels}.wav")
+    n = int(seconds * rate)
+    frames = bytearray()
+    for i in range(n):
+        v = int(20000 * math.sin(2 * math.pi * freq_hz * i / rate))
+        frames += struct.pack("<h", v) * channels
+    with wave.open(path, "wb") as wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(2)
+        wf.setframerate(rate)
+        wf.writeframes(bytes(frames))
+    return path
+
+
+def _rms(data):
+    import audioop
+    return audioop.rms(data, 2)
+
+
+def test_highfreq_is_filtered_not_aliased():
+    """Тон 18 кГц (выше Найквиста цели) должен подавляться, а не заворачиваться.
+
+    Без антиалиасинг-фильтра ratecv отразил бы 18 кГц в ~2 кГц как шум —
+    именно это поднимало шумовой пол и приводило к пропускам в субтитрах.
+    """
+    path = _make_tone_wav(18000, 0.5, 48000)
+    out = to_16k_mono_wav_bytes(path)
+    with wave.open(io.BytesIO(out), "rb") as wf:
+        pcm = wf.readframes(wf.getnframes())
+    # Исходный тон громкий (RMS ~14000); после фильтра остаток должен быть мал.
+    assert _rms(pcm) < 4000
+
+
+def test_speech_band_tone_survives():
+    """Тон 500 Гц (речевой диапазон) должен пройти почти без потерь."""
+    path = _make_tone_wav(500, 0.5, 48000)
+    out = to_16k_mono_wav_bytes(path)
+    with wave.open(io.BytesIO(out), "rb") as wf:
+        pcm = wf.readframes(wf.getnframes())
+    assert _rms(pcm) > 10000
 
 
 def test_non_wav_returned_as_is():

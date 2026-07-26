@@ -55,6 +55,11 @@ class Settings:
     # 180 с ≈ 5.8 МБ → base64 ~7.7 МБ (запас до 10 МБ). Больше не ставить.
     chunk_seconds: int = _get_int("CHUNK_SECONDS", 180)
 
+    # Сколько кусков гнать через Runpod одновременно. Ускоряет длинные файлы в
+    # разы, но реальный выигрыш ограничен настройкой Max Workers у эндпоинта
+    # Runpod: если там 1, задания встанут в очередь. 1 = строго последовательно.
+    chunk_concurrency: int = _get_int("CHUNK_CONCURRENCY", 3)
+
     # Директория для временных файлов.
     tmp_dir: str = _get("TMP_DIR", "tmp")
 

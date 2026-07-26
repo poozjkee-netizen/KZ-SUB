@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -39,24 +41,47 @@ def _runpod_transcribe(tmp_path: str, total_duration: float) -> tuple[list[Segme
     """Прокси-режим: конвертирует, при нужде режет на куски и склеивает сегменты.
 
     Синхронная (urllib внутри) — вызывается через run_in_threadpool одним заходом,
-    чтобы весь цикл нарезки шёл вне event loop. Куски гонятся последовательно
-    (эндпоинт остаётся тёплым между ними). Тайм-коды сегментов каждого куска
-    сдвигаются на смещение куска в исходном аудио. total_duration — реальная
-    длительность файла (из probe), используется для списания минут.
+    чтобы весь цикл нарезки шёл вне event loop. Куски гонятся параллельно
+    (до chunk_concurrency одновременно), порядок сегментов восстанавливается по
+    индексу куска, тайм-коды сдвигаются на смещение куска в исходном аудио.
+    total_duration — реальная длительность файла (из probe), для списания минут.
+
+    Время по этапам пишется в лог: без этого непонятно, что тормозит на длинных
+    файлах — конвертация на шлюзе или прогоны на GPU.
     """
+    t0 = time.monotonic()
     wav_bytes = to_16k_mono_wav_bytes(tmp_path)
+    convert_seconds = time.monotonic() - t0
+
     chunks = split_wav_for_runpod(wav_bytes, settings.chunk_seconds)
 
-    segments: list[Segment] = []
-    for chunk_bytes, offset in chunks:
+    def run_chunk(item: tuple[int, tuple[bytes, float]]) -> tuple[int, list[Segment]]:
+        idx, (chunk_bytes, offset) = item
+        started = time.monotonic()
         out = transcribe_via_runpod(chunk_bytes, "json")
-        for s in (out.get("segments") or []):
-            segments.append(Segment(
-                float(s["start"]) + offset, float(s["end"]) + offset, str(s["text"])
-            ))
+        segs = [
+            Segment(float(s["start"]) + offset, float(s["end"]) + offset, str(s["text"]))
+            for s in (out.get("segments") or [])
+        ]
+        logger.info("Кусок %d/%d: %d сегментов за %.1f c",
+                    idx + 1, len(chunks), len(segs), time.monotonic() - started)
+        return idx, segs
 
-    if len(chunks) > 1:
-        logger.info("Склеено %d сегментов из %d кусков", len(segments), len(chunks))
+    t1 = time.monotonic()
+    if len(chunks) == 1:
+        results = [run_chunk((0, chunks[0]))]
+    else:
+        workers = max(1, min(settings.chunk_concurrency, len(chunks)))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            results = list(pool.map(run_chunk, enumerate(chunks)))
+
+    results.sort(key=lambda r: r[0])          # порядок кусков, а не порядок ответов
+    segments = [seg for _, segs in results for seg in segs]
+
+    logger.info(
+        "Аудио %.0f c: конвертация %.1f c, кусков %d, распознавание %.1f c, сегментов %d",
+        total_duration, convert_seconds, len(chunks), time.monotonic() - t1, len(segments),
+    )
     return segments, total_duration
 
 

@@ -231,14 +231,18 @@
       els.apiUrl.value = storedUrl;
     }
     els.apiKey.value = localStorage.getItem("kzsub.apiKey") || "";
-    els.presetPath.value = localStorage.getItem("kzsub.presetPath") || "";
+    // Путь к пресету СПЕЦИАЛЬНО не восстанавливаем: поле скрыто (техпараметр),
+    // а сохранённый когда-то в dev-режиме чужой .epr молча перебивал вложенный
+    // пресет 16 kHz mono — экспорт уходил в 48 kHz stereo (тяжёлая выгрузка).
+    // Вложенный пресет — источник истины; выбор вручную живёт только до перезапуска.
+    localStorage.removeItem("kzsub.presetPath");
   } catch (e) {}
 
   function saveSettings() {
     try {
       localStorage.setItem("kzsub.apiUrl", els.apiUrl.value.trim());
       localStorage.setItem("kzsub.apiKey", els.apiKey.value.trim());
-      localStorage.setItem("kzsub.presetPath", els.presetPath.value.trim());
+      // presetPath не сохраняем — см. комментарий при восстановлении настроек.
     } catch (e) {}
   }
 

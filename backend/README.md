@@ -55,6 +55,7 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_FREE_MINUTES_PER_MONTH`| `30`         | лимит минут для бутстрап-ключей `:free` |
 | `KZSUB_MAX_AUDIO_SECONDS`     | `600`        | лимит длительности файла (сек) = 10 мин (длинные режутся на куски) |
 | `KZSUB_CHUNK_SECONDS`         | `180`        | длина куска при нарезке длинного аудио (сек); кусок должен влезать в 10 MiB Runpod |
+| `KZSUB_CHUNK_CONCURRENCY`     | `3`          | сколько кусков гнать в Runpod параллельно (ограничено Max Workers эндпоинта) |
 | `KZSUB_CAPTION_STYLE`         | `word`       | `word` (караоке, по слову) / `phrase` (фразы) |
 | `KZSUB_GLUE_MAX_CHARS`        | `2`          | в режиме `word`: короткие слова липнут к следующему |
 | `KZSUB_UPPERCASE`             | `false`      | ВЕРХНИЙ регистр субтитров            |

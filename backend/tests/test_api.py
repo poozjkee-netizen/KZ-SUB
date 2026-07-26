@@ -202,6 +202,35 @@ def test_proxy_mode_merges_chunks_with_offset(client, monkeypatch):
     assert len(calls) == 2                # оба куска ушли в Runpod
 
 
+def test_proxy_mode_parallel_chunks_keep_order(client, monkeypatch):
+    """Куски гонятся параллельно; порядок сегментов — по кускам, не по ответам."""
+    import time as _time
+    from app.config import settings as cfg
+
+    monkeypatch.setattr(cfg, "runpod_endpoint_id", "ep123")
+    monkeypatch.setattr(cfg, "runpod_api_key", "rp_secret")
+    monkeypatch.setattr(cfg, "chunk_concurrency", 3)
+    monkeypatch.setattr(
+        main, "split_wav_for_runpod",
+        lambda wav, cs, *a, **k: [(b"A", 0.0), (b"B", 10.0), (b"C", 20.0)],
+    )
+
+    def fake_runpod(audio_bytes, fmt="json"):
+        # Первый кусок отвечает ПОСЛЕДНИМ — проверяем, что сортировка не по времени ответа.
+        if audio_bytes == b"A":
+            _time.sleep(0.15)
+        return {"duration": 1.0,
+                "segments": [{"start": 0.0, "end": 1.0, "text": audio_bytes.decode()}]}
+
+    monkeypatch.setattr(main, "transcribe_via_runpod", fake_runpod)
+
+    r = client.post("/transcribe?fmt=json", files=_audio_file(), headers=_headers())
+    assert r.status_code == 200
+    segs = r.json()["segments"]
+    assert [s["text"] for s in segs] == ["A", "B", "C"]
+    assert [s["start"] for s in segs] == [0.0, 10.0, 20.0]
+
+
 def test_proxy_mode_runpod_error_is_502(client, monkeypatch):
     from app.config import settings as cfg
     from app.runpod_client import RunpodError

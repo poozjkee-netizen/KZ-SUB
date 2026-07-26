@@ -65,12 +65,44 @@ def to_16k_mono_wav_bytes(path: str) -> bytes:
     if channels == 2:
         frames = audioop.tomono(frames, width, 0.5, 0.5)
 
-    # 3) Ресемпл до 16 kHz.
+    # 3) Ресемпл до 16 kHz. ВАЖНО: перед понижением частоты обязателен
+    # антиалиасинг-фильтр. audioop.ratecv фильтра не имеет, поэтому при делении
+    # 48k→16k всё, что выше 8 кГц, заворачивалось обратно в речевой диапазон как
+    # шум: VAD принимал тихую речь за тишину, и в субтитрах появлялись пропуски.
     if rate != TARGET_RATE:
+        if rate > TARGET_RATE:
+            frames = _lowpass(frames, width)
         frames, _ = audioop.ratecv(frames, width, 1, rate, TARGET_RATE, None)
 
     logger.info("Аудио сконвертировано: %d Hz %dch -> 16000 Hz mono", rate, channels)
     return _wrap_wav(frames)
+
+
+def _lowpass(frames: bytes, width: int, passes: int = 2) -> bytes:
+    """Антиалиасинг перед понижением частоты: скользящее среднее по 3 отсчёта.
+
+    y[n] = (x[n-1] + x[n] + x[n+1]) / 3 — у такого фильтра ноль ровно на 16 кГц,
+    два прохода дают треугольное окно (−7 дБ на 8 кГц, −19 дБ на 24 кГц), чего
+    достаточно, чтобы алиасинг не поднимал шумовой пол в речевом диапазоне.
+
+    Считается операциями audioop (уровень C), а не Python-циклом: на 7 минутах
+    это ~21 млн отсчётов, поэлементный проход был бы недопустимо медленным.
+    Делим каждое слагаемое ДО суммирования — иначе audioop.add клиппует на 16 бит.
+    """
+    step = width  # смещение на один отсчёт (моно)
+    for _ in range(passes):
+        if len(frames) < 3 * step:
+            return frames
+        prev = frames[:-2 * step]      # x[n-1]
+        cur = frames[step:-step]       # x[n]
+        nxt = frames[2 * step:]        # x[n+1]
+        third = 1.0 / 3
+        frames = audioop.add(
+            audioop.add(audioop.mul(prev, width, third),
+                        audioop.mul(cur, width, third), width),
+            audioop.mul(nxt, width, third), width,
+        )
+    return frames
 
 
 def _wrap_wav(frames: bytes) -> bytes:
