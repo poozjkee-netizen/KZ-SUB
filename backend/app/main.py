@@ -28,6 +28,7 @@ from .runpod_client import AudioTooLarge, RunpodError, transcribe_via_runpod
 from .segmentation import resegment, resegment_words
 from .srt import Segment, segments_to_srt
 from .style import apply_style
+from .timing import snap_starts_to_speech
 from .transcribe import transcribe_file
 
 logging.basicConfig(level=logging.INFO)
@@ -38,7 +39,9 @@ app = FastAPI(title="KZ-SUB API", version="0.1.0")
 os.makedirs(settings.tmp_dir, exist_ok=True)
 
 
-def _runpod_transcribe(tmp_path: str, total_duration: float) -> tuple[list[Segment], float]:
+def _runpod_transcribe(
+    tmp_path: str, total_duration: float,
+) -> tuple[list[Segment], float, bytes]:
     """Прокси-режим: конвертирует, при нужде режет на куски и склеивает сегменты.
 
     Синхронная (urllib внутри) — вызывается через run_in_threadpool одним заходом,
@@ -46,6 +49,8 @@ def _runpod_transcribe(tmp_path: str, total_duration: float) -> tuple[list[Segme
     (до chunk_concurrency одновременно), порядок сегментов восстанавливается по
     индексу куска, тайм-коды сдвигаются на смещение куска в исходном аудио.
     total_duration — реальная длительность файла (из probe), для списания минут.
+    Возвращает также конвертированное аудио: оно нужно для привязки таймингов к
+    речи (timing.py), а конвертировать 16 kHz mono второй раз незачем.
 
     Время по этапам пишется в лог: без этого непонятно, что тормозит на длинных
     файлах — конвертация на шлюзе или прогоны на GPU.
@@ -83,7 +88,7 @@ def _runpod_transcribe(tmp_path: str, total_duration: float) -> tuple[list[Segme
         "Аудио %.0f c: конвертация %.1f c, кусков %d, распознавание %.1f c, сегментов %d",
         total_duration, convert_seconds, len(chunks), time.monotonic() - t1, len(segments),
     )
-    return segments, total_duration
+    return segments, total_duration, wav_bytes
 
 
 @app.on_event("startup")
@@ -186,7 +191,7 @@ async def transcribe(
             # панель шлёт 48 kHz stereo, а у Runpod лимит 10 MiB на запрос
             # (см. audio_convert / audio_chunk).
             try:
-                segments, duration = await run_in_threadpool(
+                segments, duration, wav_bytes = await run_in_threadpool(
                     _runpod_transcribe, tmp_path, estimated_seconds
                 )
             except AudioTooLarge as e:
@@ -197,6 +202,7 @@ async def transcribe(
                 raise HTTPException(status_code=502, detail="Сервис транскрибации недоступен")
         else:
             # Локальный режим: Whisper на этой машине.
+            wav_bytes = b""      # для привязки таймингов конвертируем ниже, по нужде
             try:
                 raw_segments, duration = await run_in_threadpool(transcribe_file, tmp_path)
             except Exception:
@@ -223,6 +229,17 @@ async def transcribe(
                 uppercase=settings.uppercase,
                 strip_punctuation=settings.strip_punctuation,
                 punct_keep=settings.punct_keep,
+            )
+
+        # Тайминги: подтягиваем начала реплик к фактическому началу речи —
+        # пословные метки Whisper «спешат» (см. timing.py). Нужно само аудио в
+        # 16 kHz mono: в прокси-режиме оно уже есть, в локальном конвертируем тут.
+        if settings.snap_to_speech and settings.snap_window_seconds > 0:
+            if not wav_bytes:
+                wav_bytes = await run_in_threadpool(to_16k_mono_wav_bytes, tmp_path)
+            segments = await run_in_threadpool(
+                snap_starts_to_speech, segments, wav_bytes,
+                settings.snap_window_seconds,
             )
 
         # Постобработка текста (зацикливания модели, пользовательский словарь).

@@ -65,6 +65,8 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_MAX_LINES`             | `2`          | макс. строк в реплике               |
 | `KZSUB_MAX_CUE_SECONDS`       | `7.0`        | макс. длительность реплики          |
 | `KZSUB_MAX_GAP_SECONDS`       | `0.8`        | пауза для разрыва реплики           |
+| `KZSUB_SNAP_TO_SPEECH`        | `true`       | подтягивать начало реплики к фактическому началу речи |
+| `KZSUB_SNAP_WINDOW_SECONDS`   | `1.0`        | окно поиска начала речи вперёд, сек (0 = выключить привязку) |
 | `KZSUB_MAX_REPEATS`           | `3`          | макс. одинаковых реплик подряд (фильтр зацикливаний Whisper; 0 = выкл) |
 | `KZSUB_MAX_CUE_DROP_SECONDS`  | `0`          | отбрасывать реплики длиннее N сек (0 = выкл) |
 | `KZSUB_LEXICON`               | (пусто)      | словарь правок `было=стало,...` (пустая правая часть удаляет слово) |
@@ -133,7 +135,14 @@ python -m app.telegram_bot set-webhook https://kzsub-gateway.fly.dev/telegram/we
 `python -m app.telegram_bot webhook-info` — проверить регистрацию;
 `delete-webhook` — снять (например, для локальной отладки long-polling).
 
-## Качество распознавания (postprocess.py + wer.py)
+## Качество распознавания (timing.py + postprocess.py + wer.py)
+**Тайминги.** Пословные метки Whisper систематически «спешат» (VAD добавляет
+паддинг перед речью, плюс смещение самого выравнивания), из-за чего текст
+появлялся раньше, чем произнесён. `timing.py` находит фактическое начало речи в
+аудио и подтягивает начало реплики к нему — только вперёд и только если реплика
+начинается в тишине, поэтому обрезать слово он не может. Настройки:
+`KZSUB_SNAP_TO_SPEECH`, `KZSUB_SNAP_WINDOW_SECONDS`.
+
 Постобработка текста живёт на **шлюзе** (катится `fly deploy`, без пересборки
 GPU-образа): фильтр зацикливаний Whisper (`KZSUB_MAX_REPEATS`), пользовательский
 словарь правок (`KZSUB_LEXICON` / `KZSUB_LEXICON_PATH`), опционально — отсев

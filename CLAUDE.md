@@ -77,7 +77,7 @@
 - **Core-логика без тяжёлых зависимостей.** Модули `srt.py`, `licenses.py`,
   `plans.py`, `segmentation.py`, `style.py`, `devices.py`, `config.py`,
   `postprocess.py`, `wer.py`, `audio_probe.py`, `audio_convert.py`,
-  `audio_chunk.py`, `telegram_bot.py` **не должны** импортировать
+  `audio_chunk.py`, `timing.py`, `telegram_bot.py` **не должны** импортировать
   `fastapi`/`faster_whisper` на уровне модуля (Whisper — лениво внутри функций).
   Это держит их dep-free-тестируемыми (`licenses.py` использует только stdlib `sqlite3`).
 - **Конфиг — только через `config.py`** и префикс `KZSUB_`. Новую настройку
@@ -154,7 +154,7 @@
 - **Два класса тестов** в `backend/tests/`:
   - **dep-free** (`test_srt`, `test_licenses`, `test_segmentation`, `test_style`,
     `test_devices`, `test_postprocess`, `test_wer`, `test_audio_probe`,
-    `test_audio_convert`, `test_audio_chunk`, `test_telegram_bot`) — запускаются без тяжёлых пакетов: `python tests/test_x.py`.
+    `test_audio_convert`, `test_audio_chunk`, `test_timing`, `test_telegram_bot`) — запускаются без тяжёлых пакетов: `python tests/test_x.py`.
     Любая новая core-логика обязана иметь такой тест.
   - **интеграционные** (`test_api`) — HTTP-контракт `/transcribe` с замоканной
     моделью; нужен `fastapi`/`httpx`: `pytest tests/test_api.py`.
