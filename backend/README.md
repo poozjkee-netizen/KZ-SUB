@@ -65,6 +65,10 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_MAX_LINES`             | `2`          | макс. строк в реплике               |
 | `KZSUB_MAX_CUE_SECONDS`       | `7.0`        | макс. длительность реплики          |
 | `KZSUB_MAX_GAP_SECONDS`       | `0.8`        | пауза для разрыва реплики           |
+| `KZSUB_MAX_REPEATS`           | `3`          | макс. одинаковых реплик подряд (фильтр зацикливаний Whisper; 0 = выкл) |
+| `KZSUB_MAX_CUE_DROP_SECONDS`  | `0`          | отбрасывать реплики длиннее N сек (0 = выкл) |
+| `KZSUB_LEXICON`               | (пусто)      | словарь правок `было=стало,...` (пустая правая часть удаляет слово) |
+| `KZSUB_LEXICON_PATH`          | (пусто)      | файл со словарём (строка на правило, `#` — комментарий) |
 | `KZSUB_TELEGRAM_BOT_TOKEN`    | (пусто)      | токен бота (@BotFather); пусто = вебхук отключён (404) |
 | `KZSUB_TELEGRAM_WEBHOOK_SECRET`| (пусто)     | секрет вебхука (заголовок `X-Telegram-Bot-Api-Secret-Token`) |
 | `KZSUB_TELEGRAM_ADMIN_IDS`    | (пусто)      | Telegram ID продавца(ов) через запятую — подтверждают оплату |
@@ -78,6 +82,12 @@ python tests/test_licenses.py
 python tests/test_segmentation.py
 python tests/test_style.py
 python tests/test_devices.py
+python tests/test_postprocess.py
+python tests/test_wer.py
+python tests/test_audio_probe.py
+python tests/test_audio_convert.py
+python tests/test_audio_chunk.py
+python tests/test_telegram_bot.py
 
 # Интеграционный тест HTTP-контракта /transcribe (нужен fastapi/httpx,
 # модель Whisper замокана — GPU/веса не требуются):
@@ -122,6 +132,21 @@ python -m app.telegram_bot set-webhook https://kzsub-gateway.fly.dev/telegram/we
 ```
 `python -m app.telegram_bot webhook-info` — проверить регистрацию;
 `delete-webhook` — снять (например, для локальной отладки long-polling).
+
+## Качество распознавания (postprocess.py + wer.py)
+Постобработка текста живёт на **шлюзе** (катится `fly deploy`, без пересборки
+GPU-образа): фильтр зацикливаний Whisper (`KZSUB_MAX_REPEATS`), пользовательский
+словарь правок (`KZSUB_LEXICON` / `KZSUB_LEXICON_PATH`), опционально — отсев
+неправдоподобно долгих реплик (`KZSUB_MAX_CUE_DROP_SECONDS`).
+
+Замер качества — обязательный гейт для любой правки «на качество»:
+```bash
+python -m app.wer эталон.txt распознанное.srt     # WER + CER, разбор ошибок
+python -m app.wer эталон.txt распознанное.srt --keep-punct
+```
+Порядок работы: получить `.srt` до правки → сохранить WER → внести правку →
+сравнить. Без цифр улучшения недоказуемы, а регресс не виден.
+См. `docs/tasks/04-asr-quality.md`.
 
 ## Что здесь заглушка (доработать для прода)
 - **Оплата** — Standard выдаётся полу-авто через Telegram-бота (см. выше) или

@@ -23,6 +23,7 @@ from .audio_probe import probe_duration_seconds
 from .config import settings
 from .devices import DeviceLimitError, check_device
 from .licenses import LicenseError
+from .postprocess import postprocess
 from .runpod_client import AudioTooLarge, RunpodError, transcribe_via_runpod
 from .segmentation import resegment, resegment_words
 from .srt import Segment, segments_to_srt
@@ -223,6 +224,11 @@ async def transcribe(
                 strip_punctuation=settings.strip_punctuation,
                 punct_keep=settings.punct_keep,
             )
+
+        # Постобработка текста (зацикливания модели, пользовательский словарь).
+        # Общая для обоих режимов и намеренно на шлюзе: катится fly deploy, без
+        # пересборки GPU-образа (см. postprocess.py).
+        segments = postprocess(segments)
 
         # Списываем фактически обработанные минуты.
         licenses.commit_usage(x_api_key, (duration or estimated_seconds) / 60.0)
