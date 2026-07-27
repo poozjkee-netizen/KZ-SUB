@@ -154,7 +154,8 @@
 - **Два класса тестов** в `backend/tests/`:
   - **dep-free** (`test_srt`, `test_licenses`, `test_segmentation`, `test_style`,
     `test_devices`, `test_postprocess`, `test_wer`, `test_audio_probe`,
-    `test_audio_convert`, `test_audio_chunk`, `test_timing`, `test_telegram_bot`) — запускаются без тяжёлых пакетов: `python tests/test_x.py`.
+    `test_audio_convert`, `test_audio_chunk`, `test_timing`,
+    `test_transcribe_options`, `test_telegram_bot`) — запускаются без тяжёлых пакетов: `python tests/test_x.py`.
     Любая новая core-логика обязана иметь такой тест.
   - **интеграционные** (`test_api`) — HTTP-контракт `/transcribe` с замоканной
     моделью; нужен `fastapi`/`httpx`: `pytest tests/test_api.py`.

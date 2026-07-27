@@ -84,6 +84,34 @@ def test_order_and_no_overlap_preserved():
     assert [s.text for s in out] == ["А", "Б", "В"]       # текст не перепутан
 
 
+def test_long_cue_does_not_drag_following_cues():
+    """Регресс: длинная реплика не должна утаскивать за собой поток.
+
+    Раньше сдвиг шёл цепочкой «от конца предыдущей реплики», и одна долгая
+    галлюцинация (на музыке их много) сдвигала десятки следующих реплик в одну
+    точку — вместо исправления получался рассинхрон.
+    """
+    wav = _wav([(0.5, 8.0)], 10.0)                 # речь почти везде
+    segs = [
+        Segment(1.0, 7.0, "ДОЛГАЯ"),               # длинная реплика
+        Segment(2.0, 2.4, "А"),                    # следующие лежат ВНУТРИ неё
+        Segment(3.0, 3.4, "Б"),
+        Segment(4.0, 4.4, "В"),
+    ]
+    out = snap_starts_to_speech(segs, wav, window_seconds=1.5)
+    # Короткие реплики остались на своих местах, а не уехали к 7.0.
+    assert [round(s.start, 2) for s in out[1:]] == [2.0, 3.0, 4.0]
+
+
+def test_snap_never_crosses_next_cue():
+    """Реплика не заходит на начало следующей, даже если речь начинается позже."""
+    wav = _wav([(3.5, 4.5)], 6.0)
+    segs = [Segment(2.0, 2.4, "А"), Segment(2.6, 3.0, "Б")]
+    out = snap_starts_to_speech(segs, wav, window_seconds=2.0)
+    assert out[0].start <= segs[1].start - 0.1      # не наехали на следующую
+    assert out[0].start >= segs[0].start            # и не поехали назад
+
+
 def test_disabled_by_zero_window():
     wav = _wav([(3.0, 4.0)], 5.0)
     seg = Segment(2.0, 2.5, "СӨЗ")

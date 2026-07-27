@@ -34,6 +34,43 @@ def _get_model():
     return _model
 
 
+def decode_options() -> dict:
+    """Параметры вызова model.transcribe — отдельно, чтобы их можно было проверить.
+
+    Собраны против двух реальных жалоб (см. docs/tasks/04-asr-quality.md):
+      • «выдуманные слова» — condition_on_previous_text выключен (модель иначе
+        продолжает свою же галлюцинацию как контекст), плюс пороги отсечения
+        no_speech / log_prob / compression_ratio и пропуск длинной тишины;
+      • «текст раньше речи» — уменьшенный VAD-паддинг (штатные 400 мс сдвигали
+        начало реплики вперёд самой речи).
+
+    Все значения — через config.py, чтобы подбирать их без правки кода. Но учти:
+    модуль работает в ВОРКЕРЕ, поэтому в проде изменения требуют пересборки
+    GPU-образа, а не только fly deploy.
+    """
+    opts = {
+        "language": settings.language,
+        "task": "transcribe",
+        "beam_size": 5,
+        "word_timestamps": True,          # нужны для нарезки по словам
+        "vad_filter": True,               # отсекаем тишину -> точнее тайм-коды
+        "vad_parameters": {
+            "min_silence_duration_ms": settings.vad_min_silence_ms,
+            "speech_pad_ms": settings.vad_speech_pad_ms,
+            "threshold": settings.vad_threshold,
+        },
+        "condition_on_previous_text": settings.condition_on_previous_text,
+        "no_speech_threshold": settings.no_speech_threshold,
+        "log_prob_threshold": settings.log_prob_threshold,
+        "compression_ratio_threshold": settings.compression_ratio_threshold,
+    }
+    # 0 = не использовать: параметр появился в faster-whisper 1.x и работает
+    # только вместе с word_timestamps.
+    if settings.hallucination_silence_threshold > 0:
+        opts["hallucination_silence_threshold"] = settings.hallucination_silence_threshold
+    return opts
+
+
 def transcribe_file(path: str) -> tuple[list[RawSegment], float]:
     """Транскрибирует аудиофайл на казахском.
 
@@ -46,16 +83,7 @@ def transcribe_file(path: str) -> tuple[list[RawSegment], float]:
     """
     model = _get_model()
 
-    segments_iter, info = model.transcribe(
-        path,
-        language=settings.language,
-        task="transcribe",
-        vad_filter=True,              # отсекаем тишину -> точнее тайм-коды
-        vad_parameters={"min_silence_duration_ms": 400},
-        beam_size=5,
-        condition_on_previous_text=True,
-        word_timestamps=True,
-    )
+    segments_iter, info = model.transcribe(path, **decode_options())
 
     raw: list[RawSegment] = []
     for s in segments_iter:

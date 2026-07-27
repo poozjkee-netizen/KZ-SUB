@@ -79,7 +79,12 @@ def snap_starts_to_speech(
     window_seconds — насколько далеко вперёд искать речь (0 = выключено).
     Реплика, которая уже начинается на речи, не трогается. Если сдвиг съел бы
     почти всю реплику, двигаем её целиком, сохраняя длительность: при
-    систематическом лиде это и нужно. Порядок и отсутствие наложений сохраняются.
+    систематическом лиде это и нужно.
+
+    Сдвиг каждой реплики строго локален и ограничен началом следующей: реплика,
+    которую не двигали, не может сместить соседей. Это важно — цепочка «от конца
+    предыдущей» приводила к тому, что одна длинная реплика утаскивала за собой
+    весь последующий поток.
     """
     if window_seconds <= 0 or not segments or not _HAVE_AUDIOOP or not wav_bytes:
         return segments
@@ -106,10 +111,14 @@ def snap_starts_to_speech(
 
     out: list[Segment] = []
     moved = 0
-    prev_end = 0.0
-    for seg in segments:
+    for i, seg in enumerate(segments):
         start, end = seg.start, seg.end
         idx = int(start / frame_s)
+        # Ограничитель — НАЧАЛО СЛЕДУЮЩЕЙ реплики в исходном виде. Намеренно не
+        # тянем цепочку от конца предыдущей: одна длинная реплика (а на музыке
+        # Whisper их выдаёт) сдвигала бы за собой весь последующий поток, и
+        # десятки реплик слипались в одну точку — рассинхрон вместо исправления.
+        next_start = segments[i + 1].start if i + 1 < len(segments) else None
 
         # Двигаем только реплики, начинающиеся в тишине: если слово уже звучит,
         # сдвиг вперёд отрезал бы его начало.
@@ -117,18 +126,17 @@ def snap_starts_to_speech(
             onset = _find_onset(energies, idx, idx + window_frames, threshold)
             if onset is not None and onset > idx:
                 new_start = onset * frame_s
-                duration = end - start
-                if new_start > end - MIN_CUE_SECONDS:
-                    end = new_start + duration      # сдвиг целиком
-                start = new_start
-                moved += 1
+                if next_start is not None:
+                    new_start = min(new_start, next_start - MIN_CUE_SECONDS)
+                if new_start > start:
+                    duration = end - start
+                    if new_start > end - MIN_CUE_SECONDS:
+                        end = new_start + duration      # сдвиг целиком
+                        if next_start is not None:
+                            end = min(end, next_start)
+                    start = new_start
+                    moved += 1
 
-        # Не наезжаем на предыдущую реплику и не переворачиваем порядок.
-        if start < prev_end:
-            shift = prev_end - start
-            start += shift
-            end = max(end, start + MIN_CUE_SECONDS)
-        prev_end = end
         out.append(Segment(start, end, seg.text))
 
     if moved:

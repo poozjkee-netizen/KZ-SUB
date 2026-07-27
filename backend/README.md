@@ -49,6 +49,14 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_WHISPER_MODEL`         | `large-v3`   | модель Whisper                      |
 | `KZSUB_DEVICE`                | `cpu`        | `cpu` / `cuda`                      |
 | `KZSUB_COMPUTE_TYPE`          | `int8`       | тип вычислений                      |
+| `KZSUB_CONDITION_ON_PREVIOUS_TEXT`| `false`  | опора на предыдущий текст — главный источник «выдуманных слов» (воркер) |
+| `KZSUB_NO_SPEECH_THRESHOLD`   | `0.6`        | порог «здесь нет речи» (воркер) |
+| `KZSUB_LOG_PROB_THRESHOLD`    | `-1.0`       | отсев сегментов с низкой уверенностью (воркер) |
+| `KZSUB_COMPRESSION_RATIO_THRESHOLD`| `2.4`   | ловит зацикленный повторяющийся бред (воркер) |
+| `KZSUB_HALLUCINATION_SILENCE_THRESHOLD`| `2.0` | пропускать тишину длиннее N сек (0 = выкл; воркер) |
+| `KZSUB_VAD_SPEECH_PAD_MS`     | `200`        | паддинг VAD; штатные 400 мс = субтитр раньше слова (воркер) |
+| `KZSUB_VAD_MIN_SILENCE_MS`    | `400`        | пауза для деления речи на фрагменты (воркер) |
+| `KZSUB_VAD_THRESHOLD`         | `0.5`        | чувствительность VAD (воркер) |
 | `KZSUB_DEVELOPER_KEY`         | (пусто)      | бессрочный безлимитный ключ разработчика (Fly secret) |
 | `KZSUB_API_KEYS`              | (пусто)      | бутстрап-ключи `ключ:тариф,...` → заносятся в БД лицензий |
 | `KZSUB_LICENSE_DB`            | (пусто)      | путь к БД лицензий (пусто = `STATE_DIR/licenses.db`) |
@@ -65,7 +73,7 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_MAX_LINES`             | `2`          | макс. строк в реплике               |
 | `KZSUB_MAX_CUE_SECONDS`       | `7.0`        | макс. длительность реплики          |
 | `KZSUB_MAX_GAP_SECONDS`       | `0.8`        | пауза для разрыва реплики           |
-| `KZSUB_SNAP_TO_SPEECH`        | `true`       | подтягивать начало реплики к фактическому началу речи |
+| `KZSUB_SNAP_TO_SPEECH`        | `false`      | подтягивать начало реплики к началу речи (выкл по умолчанию) |
 | `KZSUB_SNAP_WINDOW_SECONDS`   | `1.0`        | окно поиска начала речи вперёд, сек (0 = выключить привязку) |
 | `KZSUB_MAX_REPEATS`           | `3`          | макс. одинаковых реплик подряд (фильтр зацикливаний Whisper; 0 = выкл) |
 | `KZSUB_MAX_CUE_DROP_SECONDS`  | `0`          | отбрасывать реплики длиннее N сек (0 = выкл) |
@@ -90,6 +98,8 @@ python tests/test_audio_probe.py
 python tests/test_audio_convert.py
 python tests/test_audio_chunk.py
 python tests/test_telegram_bot.py
+python tests/test_timing.py
+python tests/test_transcribe_options.py
 
 # Интеграционный тест HTTP-контракта /transcribe (нужен fastapi/httpx,
 # модель Whisper замокана — GPU/веса не требуются):
@@ -136,12 +146,20 @@ python -m app.telegram_bot set-webhook https://kzsub-gateway.fly.dev/telegram/we
 `delete-webhook` — снять (например, для локальной отладки long-polling).
 
 ## Качество распознавания (timing.py + postprocess.py + wer.py)
-**Тайминги.** Пословные метки Whisper систематически «спешат» (VAD добавляет
-паддинг перед речью, плюс смещение самого выравнивания), из-за чего текст
-появлялся раньше, чем произнесён. `timing.py` находит фактическое начало речи в
-аудио и подтягивает начало реплики к нему — только вперёд и только если реплика
-начинается в тишине, поэтому обрезать слово он не может. Настройки:
-`KZSUB_SNAP_TO_SPEECH`, `KZSUB_SNAP_WINDOW_SECONDS`.
+**Тайминги и «выдуманные слова».** Оба дефекта родом из декодирования, поэтому
+основные рычаги — в **воркере** (`transcribe.py`, `decode_options()`), и для
+прода они требуют **пересборки GPU-образа**:
+- `KZSUB_CONDITION_ON_PREVIOUS_TEXT=false` — главный источник галлюцинаций:
+  модель подхватывает собственный выдуманный текст как контекст;
+- `KZSUB_HALLUCINATION_SILENCE_THRESHOLD`, `KZSUB_NO_SPEECH_THRESHOLD`,
+  `KZSUB_LOG_PROB_THRESHOLD`, `KZSUB_COMPRESSION_RATIO_THRESHOLD` — отсев текста,
+  надуманного в тишине и на музыке;
+- `KZSUB_VAD_SPEECH_PAD_MS=200` (вместо штатных 400) — именно этот паддинг
+  сдвигал начало субтитра раньше слова.
+
+Дополнительно на шлюзе есть привязка начала реплики к фактическому началу речи
+(`timing.py`, `KZSUB_SNAP_TO_SPEECH`) — **выключена по умолчанию**: на реальном
+материале она сделала хуже, включать только с проверкой результата.
 
 Постобработка текста живёт на **шлюзе** (катится `fly deploy`, без пересборки
 GPU-образа): фильтр зацикливаний Whisper (`KZSUB_MAX_REPEATS`), пользовательский

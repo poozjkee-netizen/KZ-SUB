@@ -1,0 +1,60 @@
+"""Тесты параметров декодирования Whisper (без faster-whisper — только опции).
+
+Модель импортируется лениво, поэтому набор опций проверяется dep-free.
+Запуск: python tests/test_transcribe_options.py
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from app.config import settings  # noqa: E402
+from app.transcribe import decode_options  # noqa: E402
+
+
+def test_anti_hallucination_defaults():
+    """Против «выдуманных слов»: опора на предыдущий текст выключена."""
+    opts = decode_options()
+    assert opts["condition_on_previous_text"] is False
+    # Пороги отсечения надуманного текста присутствуют.
+    assert "no_speech_threshold" in opts
+    assert "log_prob_threshold" in opts
+    assert "compression_ratio_threshold" in opts
+
+
+def test_word_timestamps_required_for_karaoke():
+    # Пословные метки нужны нарезке по словам — без них караоке-режим деградирует.
+    assert decode_options()["word_timestamps"] is True
+
+
+def test_vad_padding_reduced_against_early_text():
+    """Паддинг VAD меньше штатных 400 мс — это и есть опережение субтитра."""
+    vad = decode_options()["vad_parameters"]
+    assert vad["speech_pad_ms"] == settings.vad_speech_pad_ms
+    assert vad["speech_pad_ms"] < 400
+    assert vad["min_silence_duration_ms"] == settings.vad_min_silence_ms
+    assert vad["threshold"] == settings.vad_threshold
+
+
+def test_hallucination_threshold_toggles_by_zero():
+    old = settings.hallucination_silence_threshold
+    try:
+        settings.hallucination_silence_threshold = 2.0
+        assert decode_options()["hallucination_silence_threshold"] == 2.0
+        settings.hallucination_silence_threshold = 0
+        assert "hallucination_silence_threshold" not in decode_options()
+    finally:
+        settings.hallucination_silence_threshold = old
+
+
+def test_language_is_fixed_to_kazakh():
+    # Авто-детект вредит: Whisper путает казахский с русским/татарским/киргизским.
+    assert decode_options()["language"] == settings.language
+
+
+if __name__ == "__main__":
+    for name, fn in list(globals().items()):
+        if name.startswith("test_") and callable(fn):
+            fn()
+            print(f"ok: {name}")
+    print("Все тесты опций декодирования пройдены.")
