@@ -118,6 +118,9 @@ body {
   justify-content: space-between;
 }
 
+/* Левая группа шапки: язык субтитров + остаток минут */
+.topbar-left { display: flex; align-items: center; gap: 8px; }
+
 /* Выбор языка в шапке (слева) */
 .lang-wrap {
   display: flex;
@@ -327,7 +330,25 @@ input[readonly] { color: var(--muted); cursor: default; }
 .status.ok { color: var(--ok); }
 .status.error { color: var(--error); }
 
-.quota { color: var(--faint); font-size: 11px; }
+/* Остаток минут в шапке: та же плашка, что и у выбора языка (.lang-wrap),
+   и тот же текст, что у .lang-select — рамка, шрифт и цвет совпадают. */
+.quota {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  transition: border-color 160ms ease;
+}
+.quota:hover { border-color: var(--border-strong); }
+/* Пустая плашка не нужна: пока баланс не загружен — её просто нет. */
+.quota:empty { display: none; }
 /* В режиме настроек остаются только ключ и подпись — баланс прячем. */
 .quota.hidden { display: none; }
 
