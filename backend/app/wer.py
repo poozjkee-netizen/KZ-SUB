@@ -153,13 +153,29 @@ def _main() -> None:
                      cer(ref, hyp, args.keep_punct)))
     rows.sort(key=lambda r: r[1].rate)
 
+    # Разбор ошибок в таблице обязателен: одинаковый WER бывает у моделей с
+    # совершенно разным поведением. Пропуск (deletion) — это несказанная
+    # реплика, замена — сказанная, но неверно. Для субтитров это разные беды:
+    # замену правят на месте, пропуск приходится набирать с нуля.
     width = max(len(r[0]) for r in rows)
-    print(f"{'файл'.ljust(width)}   {'WER':>8}   {'CER':>8}")
+    print(f"{'файл'.ljust(width)}   {'WER':>8}   {'CER':>8}"
+          f"   {'замены':>7} {'вставки':>7} {'пропуски':>8}")
     for name, w, c in rows:
-        print(f"{name.ljust(width)}   {w.rate * 100:7.2f}%   {c.rate * 100:7.2f}%")
+        print(f"{name.ljust(width)}   {w.rate * 100:7.2f}%   {c.rate * 100:7.2f}%"
+              f"   {w.substitutions:7d} {w.insertions:7d} {w.deletions:8d}")
     best = rows[0]
-    print(f"\nЛучший: {best[0]} — WER {best[1].rate * 100:.2f}%")
+    print(f"\nЛучший по WER: {best[0]} — {best[1].rate * 100:.2f}%")
     print(f"  подробно: {best[1]}")
+
+    # Много пропусков — это не «модель плохо слышит», а чаще всего наши же
+    # фильтры (VAD и пороги отсечения) вырезали речь. Проверяется прогоном
+    # с `scripts/transcribe-local.py --no-filters`.
+    worst = max(rows, key=lambda r: r[1].deletions)
+    if worst[1].total and worst[1].deletions / worst[1].total > 0.15:
+        print(f"\nВнимание: у {worst[0]} пропущено "
+              f"{worst[1].deletions / worst[1].total * 100:.0f}% слов эталона. "
+              "Прогони с --no-filters — возможно, речь режут VAD и пороги "
+              "отсечения, а не модель.")
 
 
 if __name__ == "__main__":

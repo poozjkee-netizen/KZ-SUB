@@ -35,7 +35,24 @@ def main() -> None:
     p.add_argument("--compute-type", default="int8", help="int8 (cpu) | float16 (gpu)")
     p.add_argument("--initial-prompt", default=None,
                    help="затравка декодера (проверить эффект на код-свитчинг)")
+    p.add_argument("--no-filters", action="store_true",
+                   help="выключить VAD и пороги отсечения: проверить, не наши ли "
+                        "фильтры съедают речь (диагностика пропущенных реплик)")
     args = p.parse_args()
+
+    # Диагностика пропусков. Каждый фильтр умеет выбросить настоящую речь:
+    # VAD не считает тихий участок речью, no_speech/log_prob отсекают реплику
+    # по неуверенности модели, hallucination_silence_threshold пропускает
+    # «тишину», compression_ratio выбрасывает повторяющийся текст. Прогон без
+    # них показывает, где потолок модели, а где — наши настройки.
+    if args.no_filters:
+        os.environ["KZSUB_VAD_THRESHOLD"] = "0.2"
+        os.environ["KZSUB_VAD_MIN_SILENCE_MS"] = "1000"
+        os.environ["KZSUB_NO_SPEECH_THRESHOLD"] = "1.0"
+        os.environ["KZSUB_LOG_PROB_THRESHOLD"] = "-10.0"
+        os.environ["KZSUB_COMPRESSION_RATIO_THRESHOLD"] = "100.0"
+        os.environ["KZSUB_HALLUCINATION_SILENCE_THRESHOLD"] = "0"
+        os.environ["KZSUB_MAX_REPEATS"] = "0"
 
     # Переменные окружения выставляем ДО импорта app.config: он читает их
     # один раз при импорте модуля.
@@ -70,6 +87,8 @@ def main() -> None:
     print(f"Модель: {settings.whisper_model} ({settings.device}/{settings.compute_type})")
     opts = decode_options()
     print(f"Затравка: {opts.get('initial_prompt') or '—'}")
+    if args.no_filters:
+        print("Фильтры: выключены (VAD мягкий, пороги отсечения сняты)")
     print("Распознаю… (первый запуск скачивает веса)")
 
     raw_segments, duration = transcribe_file(args.audio)

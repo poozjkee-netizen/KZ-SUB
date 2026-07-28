@@ -27,6 +27,18 @@ def test_substitution_insertion_deletion_counted():
     assert (r.substitutions, r.insertions, r.deletions) == (0, 0, 1)
 
 
+def test_skipped_sentence_shows_up_as_deletions_not_substitutions():
+    # Реальный случай: модель молча пропускает целую реплику. По WER это
+    # неотличимо от неверного распознавания (те же 4 ошибки на 8 слов), но
+    # для субтитров беда разная — поэтому разбор по типам обязателен.
+    ref = "бір екі үш төрт бес алты жеті сегіз"
+    skipped = wer(ref, "бір екі үш төрт")
+    misheard = wer(ref, "бір екі үш төрт жүз мың алма кітап")
+    assert abs(skipped.rate - misheard.rate) < 1e-9
+    assert (skipped.deletions, skipped.substitutions) == (4, 0)
+    assert (misheard.deletions, misheard.substitutions) == (0, 4)
+
+
 def test_punctuation_and_case_ignored_by_default():
     # Продукт печатает субтитры БЕЗ пунктуации и капсом — штрафовать за это нельзя.
     assert wer("Сәлем, әлем!", "СӘЛЕМ ӘЛЕМ").rate == 0.0
