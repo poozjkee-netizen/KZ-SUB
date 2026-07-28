@@ -16,7 +16,7 @@ from fastapi import FastAPI, File, Header, HTTPException, Query, Request, Upload
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
-from . import dataset, events, licenses, telegram_bot
+from . import dataset, events, licenses, notify, telegram_bot
 from .audio_chunk import split_wav_for_runpod
 from .audio_convert import to_16k_mono_wav_bytes
 from .audio_probe import probe_duration_seconds
@@ -91,13 +91,37 @@ def _runpod_transcribe(
     return segments, total_duration, wav_bytes
 
 
+async def _notify_loop() -> None:
+    """Фоновая рассылка напоминаний (минуты кончаются, срок истекает).
+
+    Отдельного планировщика на Fly нет, а заводить его ради одной задачи раз в
+    несколько часов — лишняя инфраструктура. Повторную отправку сдерживает метка
+    в самой лицензии, поэтому вторая машина не задублирует сообщение.
+    """
+    import asyncio
+
+    period = settings.notify_interval_hours * 3600
+    while True:
+        await asyncio.sleep(period)
+        try:
+            sent = await run_in_threadpool(notify.send_reminders)
+            if sent:
+                logger.info("Напоминаний отправлено: %d", sent)
+        except Exception:  # noqa: BLE001 — рассылка не должна ронять шлюз
+            logger.exception("Ошибка рассылки напоминаний")
+
+
 @app.on_event("startup")
-def _startup() -> None:
+async def _startup() -> None:
     # Готовим БД лицензий: таблица + developer-ключ + бутстрап-ключи из env.
     licenses.ensure_seeded()
     # И таблицу событий: пишем в неё из горячего пути, создавать её там поздно.
     if settings.analytics:
         events.init_db()
+    if (settings.notify_enabled and settings.telegram_bot_token
+            and settings.notify_interval_hours > 0):
+        import asyncio
+        asyncio.create_task(_notify_loop())
 
 
 @app.get("/health")

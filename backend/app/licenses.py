@@ -147,6 +147,11 @@ def init_db() -> None:
             """
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_licenses_api_key ON licenses(api_key)")
+        # Миграция для уже живущих в проде БД: отметка о посланном напоминании
+        # (notify.py). Хранится здесь, потому что сбрасывается вместе с квотой.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(licenses)")}
+        if "notified" not in cols:
+            conn.execute("ALTER TABLE licenses ADD COLUMN notified TEXT NOT NULL DEFAULT ''")
 
 
 def _row_to_license(row: sqlite3.Row) -> License:
@@ -171,6 +176,21 @@ def get_license(api_key: str) -> License | None:
             "SELECT * FROM licenses WHERE api_key = ?", (api_key,)
         ).fetchone()
     return _row_to_license(row) if row else None
+
+
+def get_notified(api_key: str) -> str:
+    """Метка последнего посланного напоминания (см. notify.py). "" — не слали."""
+    with _lock, _connect() as conn:
+        row = conn.execute(
+            "SELECT notified FROM licenses WHERE api_key = ?", (api_key,)
+        ).fetchone()
+    return (row["notified"] if row else "") or ""
+
+
+def set_notified(api_key: str, tag: str) -> None:
+    """Запомнить, о чём уже предупредили — чтобы не слать одно и то же дважды."""
+    with _lock, _connect() as conn:
+        conn.execute("UPDATE licenses SET notified = ? WHERE api_key = ?", (tag, api_key))
 
 
 def _gen_key() -> str:
@@ -309,7 +329,8 @@ def renew(api_key: str, days: int = 30, reset_minutes: bool = True) -> None:
             """UPDATE licenses
                SET expires_at = ?,
                    used_minutes = CASE WHEN ? THEN 0 ELSE used_minutes END,
-                   status = ?
+                   status = ?,
+                   notified = ''
                WHERE api_key = ?""",
             (time.time() + days * 86400, 1 if reset_minutes else 0,
              LicenseStatus.ACTIVE, api_key),
@@ -322,7 +343,8 @@ def topup(api_key: str, minutes: float) -> None:
         conn.execute(
             """UPDATE licenses
                SET total_minutes = COALESCE(total_minutes, 0) + ?,
-                   status = ?
+                   status = ?,
+                   notified = ''
                WHERE api_key = ?""",
             (minutes, LicenseStatus.ACTIVE, api_key),
         )
@@ -355,7 +377,8 @@ def change_plan(
     with _lock, _connect() as conn:
         conn.execute(
             """UPDATE licenses
-               SET type = ?, total_minutes = ?, expires_at = ?, status = ?
+               SET type = ?, total_minutes = ?, expires_at = ?, status = ?,
+                   notified = ''
                WHERE api_key = ?""",
             (type, total_minutes, expires, LicenseStatus.ACTIVE, api_key),
         )

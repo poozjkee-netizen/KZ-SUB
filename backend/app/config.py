@@ -176,6 +176,22 @@ class Settings:
     # диска остановило бы продажи, поэтому старые записи вытесняются.
     dataset_max_mb: int = _get_int("DATASET_MAX_MB", 300)
 
+    # Напоминания клиенту в Telegram (notify.py): минуты кончаются, срок истекает.
+    # Работают только для ключей, выданных ботом (у них известен чат).
+    notify_enabled: bool = _get_bool("NOTIFY_ENABLED", True)
+
+    # За сколько дней до конца подписки предупредить.
+    notify_days_before: int = _get_int("NOTIFY_DAYS_BEFORE", 3)
+
+    # Остаток минут, при котором предупреждаем. Для маленьких тарифов берётся
+    # доля от лимита (см. notify.LOW_FRACTION): на demo в 3 минуты абсолютный
+    # порог сработал бы сразу при выдаче ключа.
+    notify_min_minutes: float = float(_get("NOTIFY_MIN_MINUTES", "5"))
+
+    # Как часто шлюз проверяет, кому пора напомнить (часы). 0 = не проверять
+    # в фоне (тогда только вручную: python -m app.notify send).
+    notify_interval_hours: float = float(_get("NOTIFY_INTERVAL_HOURS", "6"))
+
     # --- Прокси-режим шлюза: Runpod Serverless GPU ---
     # Если заданы оба значения ниже, /transcribe НЕ гоняет Whisper локально,
     # а отправляет аудио в Runpod-эндпоинт. Шлюз тогда можно хостить на

@@ -90,6 +90,10 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_TELEGRAM_WEBHOOK_SECRET`| (пусто)     | секрет вебхука (заголовок `X-Telegram-Bot-Api-Secret-Token`) |
 | `KZSUB_TELEGRAM_ADMIN_IDS`    | (пусто)      | Telegram ID продавца(ов) через запятую — подтверждают оплату |
 | `KZSUB_KASPI_PHONE`           | (пусто)      | реквизит Kaspi, который бот показывает в `/buy` |
+| `KZSUB_NOTIFY_ENABLED`        | `true`       | напоминания в Telegram: минуты кончаются, срок истекает |
+| `KZSUB_NOTIFY_DAYS_BEFORE`    | `3`          | за сколько дней предупредить об окончании подписки |
+| `KZSUB_NOTIFY_MIN_MINUTES`    | `5`          | остаток минут для предупреждения (для мелких тарифов — доля лимита) |
+| `KZSUB_NOTIFY_INTERVAL_HOURS` | `6`          | как часто шлюз проверяет, кому напомнить (0 = только вручную) |
 
 ## Тесты
 ```bash
@@ -109,6 +113,7 @@ python tests/test_timing.py
 python tests/test_transcribe_options.py
 python tests/test_events.py
 python tests/test_dataset.py
+python tests/test_notify.py
 
 # Интеграционный тест HTTP-контракта /transcribe (нужен fastapi/httpx,
 # модель Whisper замокана — GPU/веса не требуются):
@@ -177,6 +182,25 @@ fly ssh console -C "python -m app.events recent --limit 20"
 
 Учёт не может уронить прогон: `record_run` глотает свои ошибки, а пропавшую
 таблицу пересоздаёт на месте. Выключается через `KZSUB_ANALYTICS=false`.
+
+## Напоминания клиентам (app/notify.py)
+По метрикам `http_402` — это не поломка, а человек, упёршийся в лимит посреди
+монтажа. Предупредить заранее дешевле: это и удержание платящих, и главный
+момент апсейла demo → standard.
+
+Шлюз раз в несколько часов проверяет лицензии и пишет владельцу в Telegram, что
+минуты заканчиваются или подписка истекает. Канал — тот же бот, что выдаёт
+ключи: у выданных им ключей в поле `email` лежит `tg:<id>`, адресат уже известен.
+Ключам, выданным вручную, писать некуда — они пропускаются.
+
+От повторов защищает метка `notified` в самой лицензии; она сбрасывается при
+продлении, пополнении и смене тарифа, то есть любое изменение квоты снова
+разрешает предупредить. Поэтому вторая машина Fly не задублирует сообщение.
+
+```bash
+fly ssh console -C "python -m app.notify list"   # кому и что отправилось бы
+fly ssh console -C "python -m app.notify send"   # отправить сейчас
+```
 
 ## Датасет речи (app/dataset.py)
 Заготовка под собственное дообучение: сохраняет аудио 16 kHz mono и черновую
