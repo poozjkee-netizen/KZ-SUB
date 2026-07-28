@@ -95,26 +95,45 @@
 это результат прода (`large-v3` + все наши настройки).
 
 ### Шаг 3. Прогнать кандидата локально
-Один раз поставить окружение и сконвертировать модель в формат CTranslate2
-(faster-whisper понимает только его):
+Один раз поставить окружение:
 
 ```bash
 python3 -m venv ~/asr-test && source ~/asr-test/bin/activate
-pip install faster-whisper transformers torch
-ct2-transformers-converter --model abilmansplus/whisper-turbo-kaz-rus-v1 \
-    --output_dir ~/kaz-rus-ct2 --quantization float16 \
-    --copy_files tokenizer.json preprocessor_config.json
+pip install faster-whisper "transformers<5" torch peft
 ```
+
+Дальше зависит от того, что лежит в репозитории модели. Открой список файлов:
+есть `config.json` — это **готовая модель**; есть только `adapter_config.json`
+и `adapter_model.safetensors` — это **LoRA-адаптер**, его сначала надо слить
+с базой.
+
+**Случай A. Готовая модель** — сразу в формат CTranslate2 (faster-whisper
+понимает только его):
+
+```bash
+ct2-transformers-converter --model abilmansplus/whisper-turbo-ksc2 \
+    --output_dir ~/ksc2-ct2 --quantization float16
+```
+
+**Случай B. LoRA-адаптер** — сначала слияние, потом та же конвертация:
+
+```bash
+python scripts/merge-lora.py abilmansplus/whisper-turbo-kaz-rus-v1 --out ~/kazrus-merged
+ct2-transformers-converter --model ~/kazrus-merged --output_dir ~/kaz-rus-ct2 \
+    --quantization float16 --copy_files tokenizer.json preprocessor_config.json
+```
+
+`scripts/merge-lora.py` сам читает базу из `base_model_name_or_path`, применяет
+`merge_and_unload()` и кладёт рядом процессор с токенизатором — то есть закрывает
+все три грабли ниже.
 
 **Грабли, на которые мы наступили** (проверено на практике):
 
-- **Модель может оказаться LoRA-адаптером, а не моделью.** Признак: в
-  репозитории есть `adapter_config.json` и `adapter_model.safetensors`, но нет
-  `config.json`. Конвертер тогда падает с «Should have a `model_type` key».
-  Лечится слиянием адаптера с базовой моделью (`pip install peft`,
-  `PeftModel.from_pretrained(...).merge_and_unload()`), причём базу нужно взять
-  из `base_model_name_or_path` в `adapter_config.json` — она может сама быть
-  чужим дообучением, а не оригинальным Whisper.
+- **Модель может оказаться LoRA-адаптером, а не моделью.** Конвертер падает с
+  «Should have a `model_type` key». Базу нужно брать из
+  `base_model_name_or_path` в `adapter_config.json` — она может сама быть чужим
+  дообучением, а не оригинальным Whisper (у `whisper-turbo-kaz-rus-v1` база —
+  `whisper-turbo-ksc2`, то есть дообучение поверх дообучения).
 - **`--copy_files tokenizer.json` падает**, если файла нет в репозитории —
   просто убери аргумент, faster-whisper подтянет стандартный токенизатор сам.
 - **`Invalid input features shape: expected (1, 128, 3000), got (1, 80, 3000)`** —
@@ -129,6 +148,9 @@ ct2-transformers-converter --model abilmansplus/whisper-turbo-kaz-rus-v1 \
   for fn in ['preprocessor_config.json', 'tokenizer.json']:
       shutil.copy(hf_hub_download('openai/whisper-large-v3-turbo', fn), os.path.join(DST, fn))"
   ```
+- **Путь к несуществующей папке** faster-whisper принимает за имя репозитория на
+  HuggingFace и падает с «Repo id must be in the form …». Значит, шаг конвертации
+  не отработал; `scripts/transcribe-local.py` теперь ловит это и говорит прямо.
 
 Затем прогнать тем же конвейером, что и прод:
 
@@ -142,7 +164,7 @@ python scripts/transcribe-local.py запись.wav --out kazrus.srt --model ~/k
 ### Шаг 4. Сравнить цифрами
 ```bash
 cd backend
-python -m app.wer ../docs/samples/asr-test-kk-ru.txt ../current.srt ../kazrus.srt
+python -m app.wer ../docs/samples/asr-test-kk-ru.txt ~/Desktop/large-v3.srt ~/Desktop/ksc2.srt ~/Desktop/kazrus.srt
 ```
 Таблица сортируется по WER — победитель сверху. Смотреть надо на оба числа:
 WER показывает общую точность, CER мягче к ошибкам в одну букву (қ/к, і/и) и
