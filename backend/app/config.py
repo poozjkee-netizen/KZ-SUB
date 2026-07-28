@@ -155,6 +155,14 @@ class Settings:
     # (на Fly — том /data), иначе TMP_DIR/licenses.db. Задавать явно нужно редко.
     license_db: str = _get("LICENSE_DB", "")
 
+    # Учёт прогонов (events.py): сколько минут, отказов и по каким причинам.
+    # Включено по умолчанию — без цифр цену и лимиты не откалибровать. Ни аудио,
+    # ни текст, ни сам ключ не хранятся, только агрегируемые поля и хеши.
+    analytics: bool = _get_bool("ANALYTICS", True)
+
+    # Путь к файлу БД событий. Пусто — STATE_DIR/events.db, иначе TMP_DIR/events.db.
+    events_db: str = _get("EVENTS_DB", "")
+
     # --- Прокси-режим шлюза: Runpod Serverless GPU ---
     # Если заданы оба значения ниже, /transcribe НЕ гоняет Whisper локально,
     # а отправляет аудио в Runpod-эндпоинт. Шлюз тогда можно хостить на

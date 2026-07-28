@@ -62,6 +62,8 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_DEVELOPER_KEY`         | (пусто)      | бессрочный безлимитный ключ разработчика (Fly secret) |
 | `KZSUB_API_KEYS`              | (пусто)      | бутстрап-ключи `ключ:тариф,...` → заносятся в БД лицензий |
 | `KZSUB_LICENSE_DB`            | (пусто)      | путь к БД лицензий (пусто = `STATE_DIR/licenses.db`) |
+| `KZSUB_ANALYTICS`             | `true`       | учёт прогонов (`events.py`): минуты, отказы, время обработки |
+| `KZSUB_EVENTS_DB`             | (пусто)      | путь к БД событий (пусто = `STATE_DIR/events.db`) |
 | `KZSUB_FREE_MINUTES_PER_MONTH`| `30`         | лимит минут для бутстрап-ключей `:free` |
 | `KZSUB_MAX_AUDIO_SECONDS`     | `600`        | лимит длительности файла (сек) = 10 мин (длинные режутся на куски) |
 | `KZSUB_CHUNK_SECONDS`         | `180`        | длина куска при нарезке длинного аудио (сек); кусок должен влезать в 10 MiB Runpod |
@@ -102,6 +104,7 @@ python tests/test_audio_chunk.py
 python tests/test_telegram_bot.py
 python tests/test_timing.py
 python tests/test_transcribe_options.py
+python tests/test_events.py
 
 # Интеграционный тест HTTP-контракта /transcribe (нужен fastapi/httpx,
 # модель Whisper замокана — GPU/веса не требуются):
@@ -146,6 +149,25 @@ python -m app.telegram_bot set-webhook https://kzsub-gateway.fly.dev/telegram/we
 ```
 `python -m app.telegram_bot webhook-info` — проверить регистрацию;
 `delete-webhook` — снять (например, для локальной отладки long-polling).
+
+## Метрики прода (app/events.py)
+Каждый прогон `/transcribe` пишется строкой в SQLite на том же томе, что и
+лицензии: когда, тариф, режим, статус, длительность аудио, время обработки,
+число реплик. Отказы тоже: `http_402` (упёрся в лимит — сигнал к покупке)
+отличается от `http_502` (сервис лёг), и по срезу видно, чего было больше.
+
+**Приватность:** ни аудио, ни распознанный текст, ни сам ключ не хранятся —
+ключ и устройство только коротким хешем. Этого хватает считать уникальных
+пользователей и повторные визиты, но восстановить по базе ключ или содержимое
+ролика нельзя.
+
+```bash
+fly ssh console -C "python -m app.events summary --days 7"
+fly ssh console -C "python -m app.events recent --limit 20"
+```
+
+Учёт не может уронить прогон: `record_run` глотает свои ошибки, а пропавшую
+таблицу пересоздаёт на месте. Выключается через `KZSUB_ANALYTICS=false`.
 
 ## Качество распознавания (timing.py + postprocess.py + wer.py)
 **Тайминги и «выдуманные слова».** Оба дефекта родом из декодирования, поэтому

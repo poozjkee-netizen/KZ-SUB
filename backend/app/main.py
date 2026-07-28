@@ -16,7 +16,7 @@ from fastapi import FastAPI, File, Header, HTTPException, Query, Request, Upload
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
-from . import licenses, telegram_bot
+from . import events, licenses, telegram_bot
 from .audio_chunk import split_wav_for_runpod
 from .audio_convert import to_16k_mono_wav_bytes
 from .audio_probe import probe_duration_seconds
@@ -95,6 +95,9 @@ def _runpod_transcribe(
 def _startup() -> None:
     # Готовим БД лицензий: таблица + developer-ключ + бутстрап-ключи из env.
     licenses.ensure_seeded()
+    # И таблицу событий: пишем в неё из горячего пути, создавать её там поздно.
+    if settings.analytics:
+        events.init_db()
 
 
 @app.get("/health")
@@ -144,6 +147,44 @@ async def transcribe(
     x_device_id: str | None = Header(default=None, alias="X-Device-Id"),
     fmt: str = Query(default="srt", description="Формат ответа: 'srt' или 'json'"),
 ):
+    """Транскрибация плюс учёт прогона (events.py).
+
+    Метрики снимаются здесь, снаружи обработки: так в статистику попадают и
+    отказы по лимиту (сигнал к покупке), и падения сервиса, а сам обработчик
+    остаётся только про субтитры. Учёт не может сорвать ответ — record_run
+    молча проглатывает свои ошибки.
+    """
+    started = time.monotonic()
+    stat: dict = {"license": "", "mode": "", "audio": 0.0, "segments": 0}
+    status, reason = "ok", ""
+    try:
+        return await _transcribe(file, x_api_key, x_device_id, fmt, stat)
+    except HTTPException as e:
+        status, reason = "error", f"http_{e.status_code}"
+        raise
+    except Exception:
+        status, reason = "error", "crash"
+        raise
+    finally:
+        events.record_run(
+            x_api_key or "", status,
+            device_id=(x_device_id or "").strip(),
+            license_type=stat["license"],
+            mode=stat["mode"],
+            reason=reason,
+            audio_seconds=stat["audio"],
+            wall_seconds=time.monotonic() - started,
+            segments=stat["segments"],
+        )
+
+
+async def _transcribe(
+    file: UploadFile,
+    x_api_key: str | None,
+    x_device_id: str | None,
+    fmt: str,
+    stat: dict,
+):
     if not x_api_key:
         raise HTTPException(status_code=401, detail="Требуется заголовок X-API-Key")
 
@@ -153,6 +194,11 @@ async def transcribe(
         licenses.check_license(x_api_key, 0.0)
     except LicenseError as e:
         raise HTTPException(status_code=e.http_status, detail=str(e))
+
+    # Тариф — в метрику: отказ по лимиту у demo и у standard означает разное
+    # (первый — сигнал к покупке, второй — что лимит тесен).
+    lic = licenses.get_license(x_api_key)
+    stat["license"] = lic.type if lic else ""
 
     # Анти-шаринг: ключ работает максимум на N устройствах.
     try:
@@ -173,6 +219,7 @@ async def transcribe(
         # Длительность для предварительной проверки лимита/квоты (уточним по
         # факту после транскрибации) — точно из заголовка WAV, см. audio_probe.py.
         estimated_seconds = probe_duration_seconds(tmp_path, size)
+        stat["audio"] = estimated_seconds
         if estimated_seconds > settings.max_audio_seconds:
             raise HTTPException(status_code=413, detail="Слишком длинный файл")
 
@@ -183,6 +230,7 @@ async def transcribe(
             raise HTTPException(status_code=e.http_status, detail=str(e))
 
         proxy_mode = bool(settings.runpod_endpoint_id and settings.runpod_api_key)
+        stat["mode"] = "proxy" if proxy_mode else "local"
 
         if proxy_mode:
             # Прокси-режим: тяжёлая работа на Runpod GPU. Воркер возвращает уже
@@ -246,6 +294,8 @@ async def transcribe(
         # Общая для обоих режимов и намеренно на шлюзе: катится fly deploy, без
         # пересборки GPU-образа (см. postprocess.py).
         segments = postprocess(segments)
+        stat["segments"] = len(segments)
+        stat["audio"] = duration or estimated_seconds
 
         # Списываем фактически обработанные минуты.
         licenses.commit_usage(x_api_key, (duration or estimated_seconds) / 60.0)
