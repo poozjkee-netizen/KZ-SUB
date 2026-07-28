@@ -106,6 +106,30 @@ ct2-transformers-converter --model abilmansplus/whisper-turbo-kaz-rus-v1 \
     --copy_files tokenizer.json preprocessor_config.json
 ```
 
+**Грабли, на которые мы наступили** (проверено на практике):
+
+- **Модель может оказаться LoRA-адаптером, а не моделью.** Признак: в
+  репозитории есть `adapter_config.json` и `adapter_model.safetensors`, но нет
+  `config.json`. Конвертер тогда падает с «Should have a `model_type` key».
+  Лечится слиянием адаптера с базовой моделью (`pip install peft`,
+  `PeftModel.from_pretrained(...).merge_and_unload()`), причём базу нужно взять
+  из `base_model_name_or_path` в `adapter_config.json` — она может сама быть
+  чужим дообучением, а не оригинальным Whisper.
+- **`--copy_files tokenizer.json` падает**, если файла нет в репозитории —
+  просто убери аргумент, faster-whisper подтянет стандартный токенизатор сам.
+- **`Invalid input features shape: expected (1, 128, 3000), got (1, 80, 3000)`** —
+  самая коварная. `large-v3` и turbo используют 128 мел-каналов, но без
+  `preprocessor_config.json` в папке модели faster-whisper берёт старые 80.
+  Лечится копированием файла из оригинального Whisper:
+  ```bash
+  python -c "
+  import shutil, os
+  from huggingface_hub import hf_hub_download
+  DST = '/путь/к/модели-ct2'
+  for fn in ['preprocessor_config.json', 'tokenizer.json']:
+      shutil.copy(hf_hub_download('openai/whisper-large-v3-turbo', fn), os.path.join(DST, fn))"
+  ```
+
 Затем прогнать тем же конвейером, что и прод:
 
 ```bash

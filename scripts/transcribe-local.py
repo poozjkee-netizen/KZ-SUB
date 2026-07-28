@@ -46,6 +46,17 @@ def main() -> None:
     if args.initial_prompt is not None:
         os.environ["KZSUB_INITIAL_PROMPT"] = args.initial_prompt
 
+    # Похоже на путь, но такой папки нет — говорим об этом прямо. Иначе
+    # faster-whisper примет путь за имя репозитория на HuggingFace и ошибка
+    # уведёт в сторону («Repo id must be in the form …»).
+    if args.model and (os.sep in args.model or args.model.startswith("~")):
+        model_dir = os.path.expanduser(args.model)
+        if not os.path.isdir(model_dir):
+            sys.exit(f"Нет папки с моделью: {model_dir}\n"
+                     "Сконвертируй модель в формат CTranslate2 "
+                     "(ct2-transformers-converter) — см. docs/ASR_PROVIDERS.md")
+        os.environ["KZSUB_WHISPER_MODEL"] = model_dir
+
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sys.path.insert(0, os.path.join(root, "backend"))
 
