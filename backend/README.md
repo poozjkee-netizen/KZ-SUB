@@ -166,6 +166,11 @@ fly ssh console -C "python -m app.events summary --days 7"
 fly ssh console -C "python -m app.events recent --limit 20"
 ```
 
+> `fly ssh console` открывает шелл **не** в `/app`, поэтому CLI-команды работают
+> только благодаря `ENV PYTHONPATH=/app` в `Dockerfile.gateway`. Если видишь
+> «No module named app.…» — на машине едет образ, собранный до этой правки:
+> сначала `fly deploy --remote-only`.
+
 Учёт не может уронить прогон: `record_run` глотает свои ошибки, а пропавшую
 таблицу пересоздаёт на месте. Выключается через `KZSUB_ANALYTICS=false`.
 

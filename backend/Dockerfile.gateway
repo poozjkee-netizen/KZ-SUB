@@ -15,6 +15,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# `fly ssh console` открывает шелл не в /app, поэтому без этого CLI-команды
+# (`python -m app.events`, `python -m app.licenses`, `python -m app.telegram_bot`)
+# падают с «No module named app.…». WORKDIR действует на основной процесс, а не
+# на ssh-сессию — на эти грабли наступали уже дважды.
+ENV PYTHONPATH=/app
+
 COPY requirements-gateway.txt .
 RUN pip install --no-cache-dir -r requirements-gateway.txt
 
