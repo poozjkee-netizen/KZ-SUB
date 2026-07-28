@@ -328,6 +328,8 @@ input[readonly] { color: var(--muted); cursor: default; }
 .status.error { color: var(--error); }
 
 .quota { color: var(--faint); font-size: 11px; }
+/* В режиме настроек остаются только ключ и подпись — баланс прячем. */
+.quota.hidden { display: none; }
 
 /* ---------- Progress (этапы обработки) ---------- */
 .progress {

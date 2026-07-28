@@ -20,7 +20,7 @@
    ```bash
    ZXPSIGNCMD=~/bin/ZXPSignCmd bash scripts/build-zxp.sh   # → dist/NP-SUB-<версия>.zxp
    ```
-   Имя файла содержит версию из манифеста (`NP-SUB-1.3.0.zxp`) — сборки не путаются.
+   Имя файла содержит версию из манифеста (`NP-SUB-1.4.0.zxp`) — сборки не путаются.
    Подписывай **тем же** `dist/kzsub-cert.p12` (иначе для Premiere это «другой» плагин).
 4. Проверь установку из `.zxp` через ZXP Installer (см. DISTRIBUTION).
 5. Обнови `CHANGELOG.md`: перенеси [Unreleased] → `[X.Y.Z] — дата`.

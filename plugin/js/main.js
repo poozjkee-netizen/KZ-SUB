@@ -331,6 +331,7 @@
     els.settingsPanel.classList.toggle("hidden", !state.settingsOpen);
     els.poweredBy.classList.toggle("hidden", !state.settingsOpen);
     els.langWrap.classList.toggle("hidden", state.settingsOpen);
+    els.quota.classList.toggle("hidden", state.settingsOpen);
     if (state.settingsOpen) { setStatus(""); }
     refreshRunVisibility();
   }
@@ -423,6 +424,37 @@
     return t("test.keyInvalid");
   }
 
+  // Баланс минут под кнопкой. Источник — заголовок X-Minutes-Remaining после
+  // прогона либо GET /license при открытии панели: клиент должен понимать,
+  // сколько у него осталось, а не упираться в отказ посреди работы.
+  function showQuota(remaining) {
+    if (remaining === null || remaining === undefined || remaining === "") {
+      els.quota.textContent = "";
+      return;
+    }
+    if (String(remaining) === "unlimited") {
+      els.quota.textContent = t("quota.unlimited");
+      return;
+    }
+    var mins = parseInt(remaining, 10);
+    els.quota.textContent = isNaN(mins) ? "" : t("quota.left", { minutes: mins });
+  }
+
+  // Подтянуть баланс молча: панель уже работает, ошибку показывать незачем —
+  // проверка ключа есть в Настройках, а тут это лишь справочная строка.
+  function refreshQuota() {
+    var apiUrl = els.apiUrl.value.trim();
+    var apiKey = els.apiKey.value.trim();
+    if (!apiUrl || !apiKey) { return; }
+    checkLicense(apiUrl, apiKey)
+      .then(function (info) {
+        if (!info || !info.active) { els.quota.textContent = ""; return; }
+        var rem = info.remaining_minutes;
+        showQuota(rem === null || rem === undefined ? "unlimited" : Math.floor(rem));
+      })
+      .catch(function () { els.quota.textContent = ""; });
+  }
+
   // Показать результат проверки лицензии в заданный сеттер статуса.
   function applyLicenseInfo(info, setOk, setErr) {
     if (info.active) {
@@ -468,7 +500,10 @@
         res.on("end", function () {
           var text = Buffer.concat(chunks).toString("utf8");
           if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve(text);
+            // Остаток минут сервер кладёт в заголовок — показываем баланс
+            // сразу после прогона, без отдельного запроса. Node приводит
+            // имена заголовков к нижнему регистру.
+            resolve({ srt: text, remaining: res.headers["x-minutes-remaining"] });
           } else if (res.statusCode === 401) {
             reject(ierr("err.key401"));
           } else if (res.statusCode === 402) {
@@ -521,6 +556,11 @@
           function (m) { setStatus(m, "ok"); },
           function (m) { setStatus(m, "error"); }
         );
+        // Ключ могли сменить прямо тут — обновляем и баланс под кнопкой.
+        var rem = info.active ? info.remaining_minutes : null;
+        showQuota(info.active
+          ? (rem === null || rem === undefined ? "unlimited" : Math.floor(rem))
+          : "");
       })
       .catch(function (err) {
         setStatus(errText(err), "error");
@@ -569,8 +609,9 @@
         progStage("upload");
         return uploadForSrt(apiUrl, apiKey, wavPath, function () {
           progStage("recognize");
-        }).then(function (srt) {
-          return { srt: srt, wavPath: wavPath };
+        }).then(function (out) {
+          showQuota(out.remaining);
+          return { srt: out.srt, wavPath: wavPath };
         });
       })
       .then(function (r) {
@@ -642,6 +683,8 @@
             saveSettings();
             hideActivation();
             setStatus(t("welcome"), "ok");
+            var rem = info.remaining_minutes;
+            showQuota(rem === null || rem === undefined ? "unlimited" : Math.floor(rem));
           },
           function (m) { setActStatus(m, true); }
         );
@@ -687,5 +730,7 @@
   // Первый запуск: нет сохранённого ключа → показываем экран активации.
   if (!isActivated()) {
     showActivation();
+  } else {
+    refreshQuota();   // ключ уже есть — сразу показываем остаток минут
   }
 })();
