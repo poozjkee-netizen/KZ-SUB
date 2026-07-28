@@ -22,6 +22,23 @@ def test_anti_hallucination_defaults():
     assert "compression_ratio_threshold" in opts
 
 
+def test_defaults_favour_completeness_over_filtering():
+    """Пропуск реплики дороже лишнего слова — фильтры настроены на полноту.
+
+    Замер 2026-07-28: с выключенными фильтрами пропавшие предложения вернулись,
+    значит речь резали наши пороги, а не модель. Оставляем те средства против
+    галлюцинаций, которые ничего не удаляют (condition_on_previous_text=false,
+    сжимаемость), и отпускаем те, что выбрасывают куски аудио.
+    """
+    opts = decode_options()
+    # Порог -1.0 подобран под английский: на казахском модель менее уверена.
+    assert opts["log_prob_threshold"] <= -1.5
+    # Самый агрессивный фильтр — перепрыгивает участок целиком.
+    assert "hallucination_silence_threshold" not in opts
+    # VAD мягче штатного, иначе тихие окончания фраз не считаются речью.
+    assert opts["vad_parameters"]["threshold"] < 0.5
+
+
 def test_word_timestamps_required_for_karaoke():
     # Пословные метки нужны нарезке по словам — без них караоке-режим деградирует.
     assert decode_options()["word_timestamps"] is True

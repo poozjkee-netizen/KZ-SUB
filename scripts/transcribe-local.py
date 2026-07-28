@@ -35,6 +35,9 @@ def main() -> None:
     p.add_argument("--compute-type", default="int8", help="int8 (cpu) | float16 (gpu)")
     p.add_argument("--initial-prompt", default=None,
                    help="затравка декодера (проверить эффект на код-свитчинг)")
+    p.add_argument("--prompt-mixed", action="store_true",
+                   help="готовая затравка смешанной каз-рус речью "
+                        "(config.MIXED_SPEECH_PROMPT) против «оказашивания»")
     p.add_argument("--no-filters", action="store_true",
                    help="выключить VAD и пороги отсечения: проверить, не наши ли "
                         "фильтры съедают речь (диагностика пропущенных реплик)")
@@ -77,12 +80,17 @@ def main() -> None:
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sys.path.insert(0, os.path.join(root, "backend"))
 
-    from app.config import settings
+    from app.config import MIXED_SPEECH_PROMPT, settings
     from app.postprocess import postprocess
     from app.segmentation import resegment, resegment_words
     from app.srt import segments_to_srt
     from app.style import apply_style
     from app.transcribe import decode_options, transcribe_file
+
+    # Затравку ставим уже после импорта: конфиг читает окружение один раз, а
+    # текст затравки живёт в самом конфиге — чтобы прод и замер брали один и тот же.
+    if args.prompt_mixed:
+        settings.initial_prompt = MIXED_SPEECH_PROMPT
 
     print(f"Модель: {settings.whisper_model} ({settings.device}/{settings.compute_type})")
     opts = decode_options()

@@ -51,12 +51,12 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_COMPUTE_TYPE`          | `int8`       | тип вычислений                      |
 | `KZSUB_CONDITION_ON_PREVIOUS_TEXT`| `false`  | опора на предыдущий текст — главный источник «выдуманных слов» (воркер) |
 | `KZSUB_NO_SPEECH_THRESHOLD`   | `0.6`        | порог «здесь нет речи» (воркер) |
-| `KZSUB_LOG_PROB_THRESHOLD`    | `-1.0`       | отсев сегментов с низкой уверенностью (воркер) |
+| `KZSUB_LOG_PROB_THRESHOLD`    | `-1.5`       | отсев сегментов с низкой уверенностью; мягче штатных `-1.0`, иначе теряются реплики на казахском (воркер) |
 | `KZSUB_COMPRESSION_RATIO_THRESHOLD`| `2.4`   | ловит зацикленный повторяющийся бред (воркер) |
-| `KZSUB_HALLUCINATION_SILENCE_THRESHOLD`| `2.0` | пропускать тишину длиннее N сек (0 = выкл; воркер) |
+| `KZSUB_HALLUCINATION_SILENCE_THRESHOLD`| `0` | пропускать тишину длиннее N сек (0 = выкл; выключено — уносил настоящую речь; воркер) |
 | `KZSUB_VAD_SPEECH_PAD_MS`     | `200`        | паддинг VAD; штатные 400 мс = субтитр раньше слова (воркер) |
 | `KZSUB_VAD_MIN_SILENCE_MS`    | `400`        | пауза для деления речи на фрагменты (воркер) |
-| `KZSUB_VAD_THRESHOLD`         | `0.5`        | чувствительность VAD (воркер) |
+| `KZSUB_VAD_THRESHOLD`         | `0.35`       | чувствительность VAD: ниже — не теряем тихую речь (воркер) |
 | `KZSUB_INITIAL_PROMPT`        | (пусто)      | затравка декодера: пример смешанной каз/рус речи против «оказашивания» русских слов (воркер) |
 | `KZSUB_HOTWORDS`              | (пусто)      | подсказка редких слов/имён через запятую (воркер) |
 | `KZSUB_DEVELOPER_KEY`         | (пусто)      | бессрочный безлимитный ключ разработчика (Fly secret) |
@@ -155,7 +155,12 @@ python -m app.telegram_bot set-webhook https://kzsub-gateway.fly.dev/telegram/we
   модель подхватывает собственный выдуманный текст как контекст;
 - `KZSUB_HALLUCINATION_SILENCE_THRESHOLD`, `KZSUB_NO_SPEECH_THRESHOLD`,
   `KZSUB_LOG_PROB_THRESHOLD`, `KZSUB_COMPRESSION_RATIO_THRESHOLD` — отсев текста,
-  надуманного в тишине и на музыке;
+  надуманного в тишине и на музыке. **Каждый из них умеет выбросить настоящую
+  речь**, и замер 2026-07-28 показал, что именно они, а не модель, съедали целые
+  предложения. Поэтому баланс сдвинут к полноте: `hallucination_silence_threshold`
+  выключен, `log_prob_threshold` мягче (`-1.5`), VAD чувствительнее (`0.35`).
+  Проверить, не режут ли фильтры речь на конкретном ролике:
+  `python scripts/transcribe-local.py запись.wav --no-filters`;
 - `KZSUB_VAD_SPEECH_PAD_MS=200` (вместо штатных 400) — именно этот паддинг
   сдвигал начало субтитра раньше слова.
 
