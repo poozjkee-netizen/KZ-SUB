@@ -19,6 +19,9 @@ COPY requirements-gateway.txt .
 RUN pip install --no-cache-dir -r requirements-gateway.txt
 
 COPY app ./app
+# Словарь правок каз-рус: подключается через KZSUB_LEXICON_PATH=/app/lexicon-kk-ru.txt.
+# Живёт на шлюзе, поэтому пополняется одним `fly deploy`, без пересборки GPU-образа.
+COPY lexicon-kk-ru.txt .
 
 EXPOSE 8000
 

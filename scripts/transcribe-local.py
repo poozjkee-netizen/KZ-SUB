@@ -38,6 +38,10 @@ def main() -> None:
     p.add_argument("--prompt-mixed", action="store_true",
                    help="готовая затравка смешанной каз-рус речью "
                         "(config.MIXED_SPEECH_PROMPT) против «оказашивания»")
+    p.add_argument("--hotwords-mixed", action="store_true",
+                   help="русские вставки списком подсказок "
+                        "(config.MIXED_SPEECH_HOTWORDS): в отличие от затравки "
+                        "действуют до конца ролика, а не только в начале")
     p.add_argument("--no-filters", action="store_true",
                    help="выключить VAD и пороги отсечения: проверить, не наши ли "
                         "фильтры съедают речь (диагностика пропущенных реплик)")
@@ -80,7 +84,7 @@ def main() -> None:
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sys.path.insert(0, os.path.join(root, "backend"))
 
-    from app.config import MIXED_SPEECH_PROMPT, settings
+    from app.config import MIXED_SPEECH_HOTWORDS, MIXED_SPEECH_PROMPT, settings
     from app.postprocess import postprocess
     from app.segmentation import resegment, resegment_words
     from app.srt import segments_to_srt
@@ -91,10 +95,13 @@ def main() -> None:
     # текст затравки живёт в самом конфиге — чтобы прод и замер брали один и тот же.
     if args.prompt_mixed:
         settings.initial_prompt = MIXED_SPEECH_PROMPT
+    if args.hotwords_mixed:
+        settings.hotwords = MIXED_SPEECH_HOTWORDS
 
     print(f"Модель: {settings.whisper_model} ({settings.device}/{settings.compute_type})")
     opts = decode_options()
     print(f"Затравка: {opts.get('initial_prompt') or '—'}")
+    print(f"Подсказки: {opts.get('hotwords') or '—'}")
     if args.no_filters:
         print("Фильтры: выключены (VAD мягкий, пороги отсечения сняты)")
     print("Распознаю… (первый запуск скачивает веса)")

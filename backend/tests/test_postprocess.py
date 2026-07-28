@@ -94,6 +94,22 @@ def test_apply_lexicon_deletes_and_drops_empty_segments():
     assert [s.text for s in out] == ["сөз"]   # пустая реплика отброшена
 
 
+def test_shipped_kk_ru_lexicon_fixes_kazakhified_russian():
+    """Словарь из поставки чинит русские вставки, записанные по-казахски.
+
+    Субтитры печатаются капсом, а правила в файле — строчными: проверяем, что
+    регистр исходного слова сохраняется, иначе замена будет бросаться в глаза.
+    """
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "lexicon-kk-ru.txt")
+    with open(path, encoding="utf-8") as f:
+        rules = parse_lexicon(f.read())
+    assert rules, "словарь из поставки не должен быть пустым"
+
+    out = apply_lexicon(_segs(["БҮГІН ҚЫСТАТИ КӘНЕШНЕ ЖАҚСЫ БОЛДЫ"]), rules)
+    assert out[0].text == "БҮГІН КСТАТИ КОНЕЧНО ЖАҚСЫ БОЛДЫ"
+
+
 def test_postprocess_reads_settings_and_lexicon_file():
     old = (settings.max_repeats, settings.max_cue_drop_seconds,
            settings.lexicon, settings.lexicon_path)
