@@ -68,6 +68,13 @@ def decode_options() -> dict:
     # только вместе с word_timestamps.
     if settings.hallucination_silence_threshold > 0:
         opts["hallucination_silence_threshold"] = settings.hallucination_silence_threshold
+
+    # Затравка и подсказки передаются только если заданы: пустая строка меняет
+    # поведение декодера, поэтому не отправляем её вовсе.
+    if settings.initial_prompt.strip():
+        opts["initial_prompt"] = settings.initial_prompt.strip()
+    if settings.hotwords.strip():
+        opts["hotwords"] = settings.hotwords.strip()
     return opts
 
 

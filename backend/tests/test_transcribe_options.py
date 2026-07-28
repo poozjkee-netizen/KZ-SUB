@@ -47,6 +47,27 @@ def test_hallucination_threshold_toggles_by_zero():
         settings.hallucination_silence_threshold = old
 
 
+def test_initial_prompt_and_hotwords_optional():
+    """Затравка и подсказки передаются только когда заданы.
+
+    Пустая строка меняет поведение декодера, поэтому её не отправляем вовсе.
+    """
+    old = (settings.initial_prompt, settings.hotwords)
+    try:
+        settings.initial_prompt, settings.hotwords = "", ""
+        opts = decode_options()
+        assert "initial_prompt" not in opts and "hotwords" not in opts
+
+        # Код-свитчинг: пример смешанной речи склоняет писать русские слова по-русски.
+        settings.initial_prompt = "  Бүгін, кстати, вообще қызық болды.  "
+        settings.hotwords = "Алматы, Астана"
+        opts = decode_options()
+        assert opts["initial_prompt"] == "Бүгін, кстати, вообще қызық болды."
+        assert opts["hotwords"] == "Алматы, Астана"
+    finally:
+        settings.initial_prompt, settings.hotwords = old
+
+
 def test_language_is_fixed_to_kazakh():
     # Авто-детект вредит: Whisper путает казахский с русским/татарским/киргизским.
     assert decode_options()["language"] == settings.language

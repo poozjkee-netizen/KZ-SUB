@@ -123,18 +123,43 @@ def cer(reference: str, hypothesis: str, keep_punct: bool = False) -> ErrorRate:
 
 def _main() -> None:
     import argparse
+    import os
 
-    p = argparse.ArgumentParser(description="WER/CER распознавания (NP SUB)")
+    p = argparse.ArgumentParser(
+        description="WER/CER распознавания (NP SUB). Несколько файлов-гипотез "
+                    "сравниваются между собой — так выбирают модель.")
     p.add_argument("reference", help="эталонный текст (.txt или .srt)")
-    p.add_argument("hypothesis", help="распознанный текст (.srt или .txt)")
+    p.add_argument("hypothesis", nargs="+",
+                   help="один или несколько распознанных файлов (.srt/.txt)")
     p.add_argument("--keep-punct", action="store_true",
                    help="учитывать пунктуацию (по умолчанию игнорируется)")
     args = p.parse_args()
 
     ref = load_text(args.reference)
-    hyp = load_text(args.hypothesis)
-    print("WER:", wer(ref, hyp, args.keep_punct))
-    print("CER:", cer(ref, hyp, args.keep_punct))
+
+    if len(args.hypothesis) == 1:
+        hyp = load_text(args.hypothesis[0])
+        print("WER:", wer(ref, hyp, args.keep_punct))
+        print("CER:", cer(ref, hyp, args.keep_punct))
+        return
+
+    # Сравнение нескольких вариантов: таблица, отсортированная по WER —
+    # победитель сверху. Так выбор модели опирается на цифры, а не на ощущения.
+    rows = []
+    for path in args.hypothesis:
+        hyp = load_text(path)
+        rows.append((os.path.basename(path),
+                     wer(ref, hyp, args.keep_punct),
+                     cer(ref, hyp, args.keep_punct)))
+    rows.sort(key=lambda r: r[1].rate)
+
+    width = max(len(r[0]) for r in rows)
+    print(f"{'файл'.ljust(width)}   {'WER':>8}   {'CER':>8}")
+    for name, w, c in rows:
+        print(f"{name.ljust(width)}   {w.rate * 100:7.2f}%   {c.rate * 100:7.2f}%")
+    best = rows[0]
+    print(f"\nЛучший: {best[0]} — WER {best[1].rate * 100:.2f}%")
+    print(f"  подробно: {best[1]}")
 
 
 if __name__ == "__main__":
