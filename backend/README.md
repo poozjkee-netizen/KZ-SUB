@@ -64,6 +64,9 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_LICENSE_DB`            | (пусто)      | путь к БД лицензий (пусто = `STATE_DIR/licenses.db`) |
 | `KZSUB_ANALYTICS`             | `true`       | учёт прогонов (`events.py`): минуты, отказы, время обработки |
 | `KZSUB_EVENTS_DB`             | (пусто)      | путь к БД событий (пусто = `STATE_DIR/events.db`) |
+| `KZSUB_COLLECT_DATASET`       | `false`      | сбор датасета речи под дообучение (`dataset.py`) |
+| `KZSUB_COLLECT_KEYS`          | (пусто)      | чьи прогоны собирать — ключи через запятую; пусто = ничьи |
+| `KZSUB_DATASET_MAX_MB`        | `300`        | потолок объёма датасета; старые записи вытесняются |
 | `KZSUB_FREE_MINUTES_PER_MONTH`| `30`         | лимит минут для бутстрап-ключей `:free` |
 | `KZSUB_MAX_AUDIO_SECONDS`     | `600`        | лимит длительности файла (сек) = 10 мин (длинные режутся на куски) |
 | `KZSUB_CHUNK_SECONDS`         | `180`        | длина куска при нарезке длинного аудио (сек); кусок должен влезать в 10 MiB Runpod |
@@ -105,6 +108,7 @@ python tests/test_telegram_bot.py
 python tests/test_timing.py
 python tests/test_transcribe_options.py
 python tests/test_events.py
+python tests/test_dataset.py
 
 # Интеграционный тест HTTP-контракта /transcribe (нужен fastapi/httpx,
 # модель Whisper замокана — GPU/веса не требуются):
@@ -173,6 +177,34 @@ fly ssh console -C "python -m app.events recent --limit 20"
 
 Учёт не может уронить прогон: `record_run` глотает свои ошибки, а пропавшую
 таблицу пересоздаёт на месте. Выключается через `KZSUB_ANALYTICS=false`.
+
+## Датасет речи (app/dataset.py)
+Заготовка под собственное дообучение: сохраняет аудио 16 kHz mono и черновую
+разметку (распознанный текст с тайм-кодами) на том же томе. Открытые
+дообученные модели наш `large-v3` не бьют (см. `docs/ASR_PROVIDERS.md`), поэтому
+отрыв по качеству даст только своя модель — а копить материал надо с первого дня.
+
+**Выключено по умолчанию.** Включается двумя переменными, и обе обязательны:
+
+```bash
+fly secrets set KZSUB_COLLECT_DATASET=true
+fly secrets set KZSUB_COLLECT_KEYS=свой-ключ
+```
+
+`KZSUB_COLLECT_KEYS` пуст — не собирается ничего даже при включённом сборе: это
+защита от молчаливого сбора чужой речи. Начинать имеет смысл со своего ключа —
+собственные ролики дают данные без вопросов о согласии. Для чужих записей нужно
+явное согласие пользователя.
+
+```bash
+fly ssh console -C "python -m app.dataset stats"
+fly ssh console -C "python -m app.dataset prune"
+```
+
+Том шлюза общий с БД лицензий и всего 1 ГБ, поэтому есть потолок
+(`KZSUB_DATASET_MAX_MB`, по умолчанию 300 МБ ≈ 2.6 ч речи) и вытеснение самых
+старых записей. Заполненный датасет надо периодически забирать с тома к себе —
+иначе новые записи вытеснят старые.
 
 ## Качество распознавания (timing.py + postprocess.py + wer.py)
 **Тайминги и «выдуманные слова».** Оба дефекта родом из декодирования, поэтому

@@ -16,7 +16,7 @@ from fastapi import FastAPI, File, Header, HTTPException, Query, Request, Upload
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
-from . import events, licenses, telegram_bot
+from . import dataset, events, licenses, telegram_bot
 from .audio_chunk import split_wav_for_runpod
 from .audio_convert import to_16k_mono_wav_bytes
 from .audio_probe import probe_duration_seconds
@@ -296,6 +296,17 @@ async def _transcribe(
         segments = postprocess(segments)
         stat["segments"] = len(segments)
         stat["audio"] = duration or estimated_seconds
+
+        # Датасет под будущее дообучение (выключен по умолчанию, только со
+        # своих ключей — см. dataset.py). Пишем после постобработки: разметка
+        # должна совпадать с тем, что получил пользователь.
+        if dataset.should_collect(x_api_key):
+            if not wav_bytes:
+                wav_bytes = await run_in_threadpool(to_16k_mono_wav_bytes, tmp_path)
+            await run_in_threadpool(
+                dataset.store, x_api_key, wav_bytes, segments,
+                duration or estimated_seconds,
+            )
 
         # Списываем фактически обработанные минуты.
         licenses.commit_usage(x_api_key, (duration or estimated_seconds) / 60.0)
