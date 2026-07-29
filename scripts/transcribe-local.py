@@ -86,7 +86,7 @@ def main() -> None:
 
     from app.config import MIXED_SPEECH_HOTWORDS, MIXED_SPEECH_PROMPT, settings
     from app.postprocess import postprocess
-    from app.segmentation import resegment, resegment_words
+    from app.segmentation import build_captions
     from app.srt import segments_to_srt
     from app.style import apply_style
     from app.transcribe import decode_options, transcribe_file
@@ -109,16 +109,15 @@ def main() -> None:
     raw_segments, duration = transcribe_file(args.audio)
 
     # Дальше — ровно тот же конвейер, что и в проде (main.py / runpod_handler.py).
-    if settings.caption_style == "word":
-        segments = resegment_words(raw_segments, glue_max_chars=settings.glue_max_chars)
-    else:
-        segments = resegment(
-            raw_segments,
-            max_line_chars=settings.max_line_chars,
-            max_lines=settings.max_lines,
-            max_cue_seconds=settings.max_cue_seconds,
-            max_gap_seconds=settings.max_gap_seconds,
-        )
+    segments = build_captions(
+        raw_segments,
+        settings.caption_style,
+        glue_max_chars=settings.glue_max_chars,
+        max_line_chars=settings.max_line_chars,
+        max_lines=settings.max_lines,
+        max_cue_seconds=settings.max_cue_seconds,
+        max_gap_seconds=settings.max_gap_seconds,
+    )
     segments = apply_style(
         segments,
         uppercase=settings.uppercase,

@@ -25,7 +25,7 @@ from .devices import DeviceLimitError, check_device
 from .licenses import LicenseError
 from .postprocess import postprocess
 from .runpod_client import AudioTooLarge, RunpodError, transcribe_via_runpod
-from .segmentation import resegment, resegment_words
+from .segmentation import build_captions
 from .srt import Segment, segments_to_srt
 from .style import apply_style
 from .timing import snap_starts_to_speech
@@ -281,19 +281,16 @@ async def _transcribe(
                 logger.exception("Ошибка транскрибации")
                 raise HTTPException(status_code=500, detail="Ошибка транскрибации")
 
-            # Нарезаем субтитры в выбранном стиле.
-            if settings.caption_style == "word":
-                # Караоке-стиль: одно слово на реплику (предлоги липнут к слову).
-                segments = resegment_words(raw_segments, glue_max_chars=settings.glue_max_chars)
-            else:
-                # Аккуратные реплики-фразы.
-                segments = resegment(
-                    raw_segments,
-                    max_line_chars=settings.max_line_chars,
-                    max_lines=settings.max_lines,
-                    max_cue_seconds=settings.max_cue_seconds,
-                    max_gap_seconds=settings.max_gap_seconds,
-                )
+            # Нарезаем субтитры в выбранном стиле (караоке по словам / фразы).
+            segments = build_captions(
+                raw_segments,
+                settings.caption_style,
+                glue_max_chars=settings.glue_max_chars,
+                max_line_chars=settings.max_line_chars,
+                max_lines=settings.max_lines,
+                max_cue_seconds=settings.max_cue_seconds,
+                max_gap_seconds=settings.max_gap_seconds,
+            )
 
             # Оформление: регистр / пунктуация.
             segments = apply_style(

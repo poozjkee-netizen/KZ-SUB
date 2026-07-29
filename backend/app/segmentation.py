@@ -163,3 +163,39 @@ def resegment(
 
     flush()
     return cues
+
+
+# --- Выбор режима нарезки ------------------------------------------------
+# Режимов два, и выбирать между ними приходится в трёх местах: локальный
+# режим шлюза, GPU-воркер и скрипт локального прогона. Пока выбор был
+# скопирован в каждом, любая правка одного из режимов рисковала разъехаться —
+# особенно теперь, когда режим приходит в запросе от панели.
+WORD = "word"
+PHRASE = "phrase"
+STYLES = (WORD, PHRASE)
+
+
+def build_captions(
+    raw: list[RawSegment],
+    style: str,
+    *,
+    glue_max_chars: int,
+    max_line_chars: int,
+    max_lines: int,
+    max_cue_seconds: float,
+    max_gap_seconds: float,
+) -> list[Segment]:
+    """Нарезать субтитры в выбранном режиме: `word` (караоке) или `phrase`.
+
+    Неизвестное значение считаем фразовым: лучше выдать читаемые субтитры,
+    чем упасть из-за опечатки в параметре.
+    """
+    if style == WORD:
+        return resegment_words(raw, glue_max_chars=glue_max_chars)
+    return resegment(
+        raw,
+        max_line_chars=max_line_chars,
+        max_lines=max_lines,
+        max_cue_seconds=max_cue_seconds,
+        max_gap_seconds=max_gap_seconds,
+    )

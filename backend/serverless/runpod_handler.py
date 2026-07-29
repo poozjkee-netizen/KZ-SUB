@@ -24,7 +24,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.config import settings  # noqa: E402
-from app.segmentation import resegment, resegment_words  # noqa: E402
+from app.segmentation import build_captions  # noqa: E402
 from app.srt import segments_to_srt  # noqa: E402
 from app.style import apply_style  # noqa: E402
 from app.transcribe import _get_model, transcribe_file  # noqa: E402
@@ -60,16 +60,15 @@ def handler(job: dict) -> dict:
 
         raw_segments, duration = transcribe_file(tmp_path)
 
-        if settings.caption_style == "word":
-            segments = resegment_words(raw_segments, glue_max_chars=settings.glue_max_chars)
-        else:
-            segments = resegment(
-                raw_segments,
-                max_line_chars=settings.max_line_chars,
-                max_lines=settings.max_lines,
-                max_cue_seconds=settings.max_cue_seconds,
-                max_gap_seconds=settings.max_gap_seconds,
-            )
+        segments = build_captions(
+            raw_segments,
+            settings.caption_style,
+            glue_max_chars=settings.glue_max_chars,
+            max_line_chars=settings.max_line_chars,
+            max_lines=settings.max_lines,
+            max_cue_seconds=settings.max_cue_seconds,
+            max_gap_seconds=settings.max_gap_seconds,
+        )
         segments = apply_style(
             segments,
             uppercase=settings.uppercase,

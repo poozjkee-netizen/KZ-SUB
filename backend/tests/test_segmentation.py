@@ -5,7 +5,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.asr_types import RawSegment, Word  # noqa: E402
-from app.segmentation import _wrap, resegment, resegment_words  # noqa: E402
+from app.segmentation import (  # noqa: E402
+    _wrap, build_captions, resegment, resegment_words,
+)
 
 
 def _words(pairs, step=0.4, start=0.0):
@@ -103,6 +105,29 @@ def test_words_timestamps_span_group():
     cues = resegment_words(raw, glue_max_chars=2)
     assert len(cues) == 1
     assert cues[0].start == 1.0 and cues[0].end == 2.0
+
+
+def test_build_captions_picks_mode_and_falls_back_to_phrases():
+    """Режим приходит из запроса, поэтому выбор должен быть в одном месте.
+
+    Неизвестное значение не должно ронять прогон: лучше отдать читаемые
+    фразы, чем ошибку из-за опечатки в параметре.
+    """
+    words = _words(["бүгін", "кеше", "ертең", "таңертең", "кешке"])
+    raw = [RawSegment(words[0].start, words[-1].end, "x", words)]
+    common = dict(glue_max_chars=2, max_line_chars=42, max_lines=2,
+                  max_cue_seconds=7.0, max_gap_seconds=0.8)
+
+    word = build_captions(raw, "word", **common)
+    phrase = build_captions(raw, "phrase", **common)
+    assert [s.text for s in word] == [s.text for s in resegment_words(raw, glue_max_chars=2)]
+    assert [s.text for s in phrase] == [
+        s.text for s in resegment(raw, max_line_chars=42, max_lines=2,
+                                  max_cue_seconds=7.0, max_gap_seconds=0.8)
+    ]
+    assert len(word) > len(phrase)          # караоке дробит сильнее фраз
+    assert [s.text for s in build_captions(raw, "чепуха", **common)] == \
+           [s.text for s in phrase]
 
 
 if __name__ == "__main__":
