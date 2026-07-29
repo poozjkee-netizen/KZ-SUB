@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.asr_types import raw_to_json  # noqa: E402
 from app.config import settings  # noqa: E402
-from app.segmentation import build_captions  # noqa: E402
+from app.segmentation import build_captions, strip_punctuation_for  # noqa: E402
 from app.srt import segments_to_srt  # noqa: E402
 from app.style import apply_style  # noqa: E402
 from app.transcribe import _get_model, transcribe_file  # noqa: E402
@@ -93,7 +93,8 @@ def handler(job: dict) -> dict:
         segments = apply_style(
             segments,
             uppercase=settings.uppercase,
-            strip_punctuation=settings.strip_punctuation,
+            strip_punctuation=strip_punctuation_for(
+                style, settings.strip_punctuation, settings.phrase_punctuation),
             punct_keep=settings.punct_keep,
         )
 

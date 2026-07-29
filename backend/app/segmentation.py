@@ -199,3 +199,16 @@ def build_captions(
         max_cue_seconds=max_cue_seconds,
         max_gap_seconds=max_gap_seconds,
     )
+
+
+def strip_punctuation_for(style: str, strip_punctuation: bool,
+                          phrase_punctuation: bool) -> bool:
+    """Снимать ли пунктуацию при выбранном режиме нарезки.
+
+    В караоке одно слово со знаком препинания выглядит мусором, поэтому знаки
+    снимаются. Во фразах пунктуация — это читаемость, и по умолчанию она
+    остаётся: Whisper расставляет её сам, терять её незачем.
+    """
+    if style == PHRASE and phrase_punctuation:
+        return False
+    return strip_punctuation

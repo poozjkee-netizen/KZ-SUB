@@ -26,7 +26,7 @@ from .devices import DeviceLimitError, check_device
 from .licenses import LicenseError
 from .postprocess import postprocess
 from .runpod_client import AudioTooLarge, RunpodError, transcribe_via_runpod
-from .segmentation import STYLES, build_captions
+from .segmentation import STYLES, build_captions, strip_punctuation_for
 from .srt import Segment, segments_to_srt
 from .style import apply_style
 from .timing import snap_starts_to_speech
@@ -122,7 +122,11 @@ def _runpod_transcribe(
         segments = apply_style(
             segments,
             uppercase=settings.uppercase,
-            strip_punctuation=settings.strip_punctuation,
+            strip_punctuation=strip_punctuation_for(
+                style or settings.caption_style,
+                settings.strip_punctuation,
+                settings.phrase_punctuation,
+            ),
             punct_keep=settings.punct_keep,
         )
     else:
@@ -370,7 +374,11 @@ async def _transcribe(
             segments = apply_style(
                 segments,
                 uppercase=settings.uppercase,
-                strip_punctuation=settings.strip_punctuation,
+                strip_punctuation=strip_punctuation_for(
+                    style or settings.caption_style,
+                    settings.strip_punctuation,
+                    settings.phrase_punctuation,
+                ),
                 punct_keep=settings.punct_keep,
             )
 

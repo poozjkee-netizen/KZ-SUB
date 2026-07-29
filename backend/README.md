@@ -87,6 +87,7 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_GLUE_MAX_CHARS`        | `2`          | в режиме `word`: короткие слова липнут к следующему |
 | `KZSUB_UPPERCASE`             | `false`      | ВЕРХНИЙ регистр субтитров            |
 | `KZSUB_STRIP_PUNCTUATION`     | `true`       | убирать пунктуацию (караоке-стиль)   |
+| `KZSUB_PHRASE_PUNCTUATION`    | `true`       | во фразовом режиме пунктуацию НЕ убирать (там она и есть читаемость) |
 | `KZSUB_PUNCT_KEEP`            | `!`          | какие знаки оставить при очистке     |
 | `KZSUB_MAX_LINE_CHARS`        | `42`         | (режим `phrase`) макс. символов в строке |
 | `KZSUB_MAX_LINES`             | `2`          | макс. строк в реплике               |

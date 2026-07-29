@@ -86,7 +86,7 @@ def main() -> None:
 
     from app.config import MIXED_SPEECH_HOTWORDS, MIXED_SPEECH_PROMPT, settings
     from app.postprocess import postprocess
-    from app.segmentation import build_captions
+    from app.segmentation import build_captions, strip_punctuation_for
     from app.srt import segments_to_srt
     from app.style import apply_style
     from app.transcribe import decode_options, transcribe_file
@@ -121,7 +121,9 @@ def main() -> None:
     segments = apply_style(
         segments,
         uppercase=settings.uppercase,
-        strip_punctuation=settings.strip_punctuation,
+        strip_punctuation=strip_punctuation_for(
+            settings.caption_style, settings.strip_punctuation,
+            settings.phrase_punctuation),
         punct_keep=settings.punct_keep,
     )
     segments = postprocess(segments)

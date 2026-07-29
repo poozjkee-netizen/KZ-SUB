@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.asr_types import RawSegment, Word  # noqa: E402
 from app.segmentation import (  # noqa: E402
-    _wrap, build_captions, resegment, resegment_words,
+    _wrap, build_captions, resegment, resegment_words, strip_punctuation_for,
 )
 
 
@@ -128,6 +128,22 @@ def test_build_captions_picks_mode_and_falls_back_to_phrases():
     assert len(word) > len(phrase)          # караоке дробит сильнее фраз
     assert [s.text for s in build_captions(raw, "чепуха", **common)] == \
            [s.text for s in phrase]
+
+
+def test_punctuation_kept_in_phrases_and_stripped_in_karaoke():
+    """Во фразах пунктуация — это читаемость, в караоке — мусор.
+
+    Одно слово с запятой на экране выглядит ошибкой, а фраза без запятых
+    заставляет перечитывать. Whisper расставляет знаки сам, поэтому во
+    фразовом режиме их достаточно просто не трогать.
+    """
+    assert strip_punctuation_for("word", True, True) is True
+    assert strip_punctuation_for("phrase", True, True) is False
+
+    # Настройку можно выключить — тогда фразы чистятся как раньше.
+    assert strip_punctuation_for("phrase", True, False) is True
+    # А если пунктуацию вообще не снимают, режим ничего не меняет.
+    assert strip_punctuation_for("word", False, True) is False
 
 
 if __name__ == "__main__":
