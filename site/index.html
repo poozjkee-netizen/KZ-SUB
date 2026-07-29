@@ -8,6 +8,7 @@
 <meta property="og:title" content="NP SUB — қазақша субтитры прямо в Premiere Pro">
 <meta property="og:description" content="Premiere не понимает казахский. NP SUB понимает: одна кнопка — субтитры на таймлайне.">
 <meta property="og:type" content="website">
+<meta name="theme-color" content="#0A0B0C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -16,8 +17,10 @@
  * NP SUB — лендинг. Тёмная энергия, контролируемое движение, техничность.
  * Палитра и типографика заданы владельцем продукта; всё остальное подчинено
  * одной задаче — довести посетителя до кнопки «Взять демо» в Telegram.
- * Один файл без сборки и без внешних скриптов: страницу можно положить
- * куда угодно (GitHub Pages, Netlify, любой хостинг) простым копированием.
+ *
+ * Один файл без сборки и без внешних скриптов: страницу можно положить куда
+ * угодно (GitHub Pages, Netlify, любой хостинг) простым копированием.
+ * Тексты обоих языков лежат в словаре I18N внизу файла — правятся там же.
  */
 :root {
   --night: #0A0B0C;
@@ -33,12 +36,12 @@
   --sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --gap: clamp(72px, 11vw, 148px);
-  --pad: clamp(20px, 5vw, 64px);
+  --gap: clamp(64px, 11vw, 148px);
+  --pad: clamp(18px, 5vw, 64px);
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
   background: var(--night);
@@ -86,12 +89,12 @@ body::before {
 }
 .mono .tick { color: var(--lime); }
 
-h1, h2, h3 { font-weight: 800; letter-spacing: -0.025em; line-height: 1.06; margin: 0; }
-h1 { font-size: clamp(38px, 7.2vw, 78px); }
-h2 { font-size: clamp(28px, 4.4vw, 46px); }
+h1, h2, h3 { font-weight: 800; letter-spacing: -0.025em; line-height: 1.08; margin: 0; }
+h1 { font-size: clamp(31px, 7vw, 78px); }
+h2 { font-size: clamp(25px, 4.4vw, 46px); }
 h3 { font-size: 19px; letter-spacing: -0.01em; line-height: 1.3; }
 p { margin: 0; }
-.lead { font-size: clamp(17px, 2vw, 21px); color: var(--gray); max-width: 56ch; }
+.lead { font-size: clamp(16px, 2vw, 21px); color: var(--gray); max-width: 56ch; }
 .lime { color: var(--lime); }
 
 /* --- Шапка --- */
@@ -101,21 +104,16 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 22px var(--pad);
+  gap: 12px;
+  padding: 18px var(--pad);
   max-width: 1180px;
   margin: 0 auto;
 }
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-.brand-name {
-  font-family: var(--mono);
-  font-size: 13px;
-  letter-spacing: 0.2em;
-  color: var(--white);
-}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; flex: none; }
+.brand-name { font-family: var(--mono); font-size: 13px; letter-spacing: 0.2em; color: var(--white); }
 .brand svg { display: block; }
-.nav { display: flex; align-items: center; gap: 26px; }
-.nav a {
+.nav { display: flex; align-items: center; gap: 24px; }
+.nav > a {
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.12em;
@@ -124,8 +122,43 @@ header {
   text-decoration: none;
   transition: color 180ms ease;
 }
-.nav a:hover { color: var(--white); }
-@media (max-width: 720px) { .nav a:not(.nav-cta) { display: none; } }
+.nav > a:hover { color: var(--white); }
+
+/* Переключатель языка: две короткие метки, активная — лаймом. */
+.lang {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  overflow: hidden;
+  flex: none;
+}
+.lang button {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--gray);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  padding: 0 11px;
+  min-height: 34px;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+.lang button + button { border-left: 1px solid var(--line-strong); }
+.lang button:hover { color: var(--white); }
+.lang button[aria-pressed="true"] { background: var(--lime); color: var(--night); font-weight: 500; }
+.lang button:focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; }
+
+@media (max-width: 860px) {
+  .nav > a:not(.nav-cta) { display: none; }
+}
+@media (max-width: 460px) {
+  /* На узком экране кнопка в шапке уступает место нижней панели действий. */
+  .nav-cta { display: none; }
+  .brand-name { font-size: 12px; letter-spacing: 0.16em; }
+}
 
 /* --- Кнопки --- */
 .btn {
@@ -133,14 +166,15 @@ header {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  min-height: 48px;
-  padding: 0 26px;
+  min-height: 50px;
+  padding: 0 24px;
   border-radius: 2px;
   border: 1px solid transparent;
   font-family: var(--mono);
   font-size: 13px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
+  text-align: center;
   text-decoration: none;
   cursor: pointer;
   transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -150,38 +184,38 @@ header {
 .btn-primary:hover { transform: translateY(-2px); background: #D5FF63; }
 .btn-ghost { border-color: var(--line-strong); color: var(--white); }
 .btn-ghost:hover { border-color: var(--lime); color: var(--lime); }
-.btn:focus-visible, a:focus-visible {
+.btn:focus-visible, a:focus-visible, summary:focus-visible {
   outline: 2px solid var(--lime);
   outline-offset: 3px;
 }
 .nav-cta {
   border: 1px solid var(--line-strong);
-  padding: 9px 16px;
   border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
 }
 .nav-cta:hover { border-color: var(--lime); color: var(--lime) !important; }
+@media (max-width: 560px) {
+  .btn { width: 100%; }         /* полноширинные цели пальцем не промахнёшься */
+}
 
 /* --- Герой --- */
-.hero { padding: clamp(48px, 9vw, 104px) 0 var(--gap); }
-.hero h1 { margin: 22px 0 26px; max-width: 17ch; }
-.hero .lead { margin-bottom: 38px; }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
-.hero-note {
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--gray);
-  letter-spacing: 0.06em;
-}
+.hero { padding: clamp(36px, 9vw, 104px) 0 var(--gap); }
+.hero h1 { margin: 20px 0 24px; max-width: 17ch; }
+.hero .lead { margin-bottom: 34px; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.hero-note { font-family: var(--mono); font-size: 12px; color: var(--gray); letter-spacing: 0.06em; }
 
 /* Линейка-шкала под геройским блоком — «прибор», а не украшение:
    она отбивает верх страницы от показателей. */
 .ruler {
-  margin-top: clamp(48px, 7vw, 82px);
+  margin-top: clamp(40px, 7vw, 82px);
   height: 26px;
   border-top: 1px solid var(--line);
   background-image: linear-gradient(90deg, var(--line-strong) 1px, transparent 1px);
   background-size: 44px 100%;
-  background-position: 0 0;
   background-repeat: repeat-x;
   mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
@@ -190,70 +224,59 @@ header {
 /* --- Показатели --- */
 .stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
-  margin-top: 30px;
+  margin-top: 28px;
 }
-.stat { background: var(--night); padding: 26px 24px; }
+.stat { background: var(--night); padding: 24px 22px; }
 .stat b {
   display: block;
   font-family: var(--mono);
-  font-size: clamp(26px, 3.6vw, 36px);
+  font-size: clamp(24px, 3.6vw, 36px);
   font-weight: 500;
   color: var(--lime);
   letter-spacing: -0.02em;
   line-height: 1;
-  margin-bottom: 10px;
+  margin-bottom: 9px;
 }
 .stat span { font-size: 14px; color: var(--gray); }
 
 /* --- Секции --- */
 section { padding: var(--gap) 0; border-top: 1px solid var(--line); }
-.sec-head { margin-bottom: clamp(36px, 5vw, 58px); }
-.sec-head h2 { margin: 14px 0 18px; max-width: 20ch; }
+.sec-head { margin-bottom: clamp(30px, 5vw, 58px); }
+.sec-head h2 { margin: 13px 0 16px; max-width: 20ch; }
 
 /* --- Проблема / решение --- */
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
 @media (max-width: 820px) { .split { grid-template-columns: 1fr; } }
-.split > div { background: var(--night); padding: clamp(26px, 4vw, 42px); }
+.split > div { background: var(--night); padding: clamp(22px, 4vw, 42px); }
 .split h3 { margin-bottom: 12px; }
 .split p { color: var(--gray); font-size: 16px; }
 .split .bad h3 { color: var(--gray); }
 .split .good h3 { color: var(--lime); }
 
 /* --- Шаги --- */
-.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(24px, 3vw, 44px); }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(22px, 3vw, 44px); }
 @media (max-width: 820px) { .steps { grid-template-columns: 1fr; } }
-.step { border-top: 1px solid var(--line-strong); padding-top: 22px; }
-.step-n {
-  font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0.2em;
-  color: var(--lime);
-  display: block;
-  margin-bottom: 16px;
-}
+.step { border-top: 1px solid var(--line-strong); padding-top: 20px; }
+.step-n { font-family: var(--mono); font-size: 12px; letter-spacing: 0.2em; color: var(--lime); display: block; margin-bottom: 14px; }
 .step h3 { margin-bottom: 10px; }
 .step p { color: var(--gray); font-size: 15.5px; }
 
 /* --- Демо-вывод (реальный формат .srt) --- */
-.demo {
-  border: 1px solid var(--line);
-  background: var(--panel);
-  padding: clamp(20px, 3vw, 32px);
-  overflow-x: auto;
-}
+.demo { border: 1px solid var(--line); background: var(--panel); padding: clamp(18px, 3vw, 32px); }
 .demo-bar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-bottom: 18px;
-  margin-bottom: 20px;
+  padding-bottom: 16px;
+  margin-bottom: 18px;
   border-bottom: 1px solid var(--line);
 }
 .dot { width: 7px; height: 7px; background: var(--lime); border-radius: 50%; flex: none; }
+.demo-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .demo pre {
   margin: 0;
   font-family: var(--mono);
@@ -264,38 +287,37 @@ section { padding: var(--gap) 0; border-top: 1px solid var(--line); }
 }
 .demo .tc { color: var(--gray); }
 .demo .ru { color: var(--lime); }
-.demo-note { margin-top: 18px; font-size: 14px; color: var(--gray); }
+.demo-note { margin-top: 16px; font-size: 14px; color: var(--gray); }
+@media (max-width: 560px) {
+  /* На телефоне тайм-код и реплика не помещаются в строку — разносим по строкам,
+     чтобы читать без горизонтальной прокрутки. */
+  .demo pre { font-size: 12.5px; line-height: 1.75; white-space: pre-wrap; }
+  .demo .tc { display: block; }
+}
 
 /* --- Возможности --- */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
 }
-.card { background: var(--night); padding: clamp(24px, 3vw, 34px); }
-.card svg { color: var(--lime); margin-bottom: 18px; display: block; }
+.card { background: var(--night); padding: clamp(22px, 3vw, 34px); }
+.card svg { color: var(--lime); margin-bottom: 16px; display: block; }
 .card h3 { margin-bottom: 10px; }
 .card p { color: var(--gray); font-size: 15.5px; }
 
 /* --- Тарифы --- */
 .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
 @media (max-width: 820px) { .plans { grid-template-columns: 1fr; } }
-.plan { background: var(--night); padding: clamp(28px, 4vw, 44px); display: flex; flex-direction: column; }
+.plan { background: var(--night); padding: clamp(24px, 4vw, 44px); display: flex; flex-direction: column; }
 .plan.featured { background: var(--panel); }
 .plan-name { font-family: var(--mono); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gray); }
 .plan.featured .plan-name { color: var(--lime); }
-.price {
-  font-family: var(--mono);
-  font-size: clamp(34px, 5vw, 46px);
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  margin: 18px 0 6px;
-  line-height: 1;
-}
-.price-note { font-size: 14px; color: var(--gray); margin-bottom: 26px; }
-.plan ul { list-style: none; margin: 0 0 30px; padding: 0; display: grid; gap: 12px; }
+.price { font-family: var(--mono); font-size: clamp(32px, 5vw, 46px); font-weight: 500; letter-spacing: -0.02em; margin: 16px 0 6px; line-height: 1; }
+.price-note { font-size: 14px; color: var(--gray); margin-bottom: 24px; }
+.plan ul { list-style: none; margin: 0 0 28px; padding: 0; display: grid; gap: 12px; }
 .plan li { display: flex; gap: 11px; align-items: flex-start; font-size: 15.5px; color: var(--gray); }
 .plan li svg { flex: none; margin-top: 5px; color: var(--lime); }
 .plan .btn { margin-top: auto; }
@@ -304,49 +326,38 @@ section { padding: var(--gap) 0; border-top: 1px solid var(--line); }
 .faq { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
 details { background: var(--night); }
 summary {
-  padding: 22px clamp(20px, 3vw, 30px);
+  padding: 20px clamp(18px, 3vw, 30px);
+  min-height: 56px;
   cursor: pointer;
   font-weight: 600;
-  font-size: 16.5px;
+  font-size: 16px;
   list-style: none;
   display: flex;
   justify-content: space-between;
-  gap: 18px;
+  gap: 16px;
   align-items: center;
   transition: color 180ms ease;
 }
 summary:hover { color: var(--lime); }
 summary::-webkit-details-marker { display: none; }
-summary::after {
-  content: "+";
-  font-family: var(--mono);
-  color: var(--lime);
-  font-size: 20px;
-  line-height: 1;
-  flex: none;
-}
+summary::after { content: "+"; font-family: var(--mono); color: var(--lime); font-size: 20px; line-height: 1; flex: none; }
 details[open] summary::after { content: "−"; }
-details p {
-  padding: 0 clamp(20px, 3vw, 30px) 24px;
-  color: var(--gray);
-  font-size: 15.5px;
-  max-width: 74ch;
-}
+details p { padding: 0 clamp(18px, 3vw, 30px) 22px; color: var(--gray); font-size: 15.5px; max-width: 74ch; }
 
 /* --- Финальный призыв --- */
 .final { text-align: center; padding: var(--gap) 0; border-top: 1px solid var(--line); }
-.final h2 { margin: 16px auto 20px; max-width: 18ch; }
-.final .lead { margin: 0 auto 34px; text-align: center; }
+.final h2 { margin: 14px auto 18px; max-width: 18ch; }
+.final .lead { margin: 0 auto 30px; text-align: center; }
 
 /* --- Подвал --- */
 footer {
   border-top: 1px solid var(--line);
-  padding: 34px var(--pad);
+  padding: 30px var(--pad) calc(30px + var(--safe-bottom, 0px));
   max-width: 1180px;
   margin: 0 auto;
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 14px;
   justify-content: space-between;
   align-items: center;
   font-family: var(--mono);
@@ -358,6 +369,29 @@ footer {
 footer a { text-decoration: none; }
 footer a:hover { color: var(--lime); }
 
+/* --- Мобильная панель действия ---
+   На телефоне кнопка из шапки уезжает вверх и теряется, а решение о демо
+   человек принимает где-то в середине страницы. Панель держит действие
+   под большим пальцем, но появляется только после первого экрана. */
+.dock {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 5;
+  display: none;
+  padding: 10px var(--pad) calc(10px + env(safe-area-inset-bottom));
+  background: rgba(10, 11, 12, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line-strong);
+  transform: translateY(110%);
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dock.show { transform: none; }
+@media (max-width: 560px) {
+  .dock { display: block; }
+  footer { padding-bottom: 104px; }   /* панель не должна накрывать подвал */
+}
+
 /* --- Появление при скролле: движение подчёркивает порядок чтения --- */
 .rise { opacity: 0; transform: translateY(18px); transition: opacity 520ms ease, transform 520ms cubic-bezier(0.16, 1, 0.3, 1); }
 .rise.in { opacity: 1; transform: none; }
@@ -365,13 +399,14 @@ footer a:hover { color: var(--lime); }
   html { scroll-behavior: auto; }
   .rise { opacity: 1; transform: none; transition: none; }
   .btn:hover { transform: none; }
+  .dock { transition: none; }
 }
 </style>
 </head>
 <body>
 
 <header>
-  <a class="brand" href="#top" aria-label="NP SUB — на главную">
+  <a class="brand" href="#top" aria-label="NP SUB">
     <!-- Небольшой знак: две «дорожки» субтитров на таймлайне. -->
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
       <rect x="0.5" y="0.5" width="21" height="21" stroke="#303237"/>
@@ -381,10 +416,14 @@ footer a:hover { color: var(--lime); }
     <span class="brand-name">NP SUB</span>
   </a>
   <nav class="nav">
-    <a href="#how">Как работает</a>
-    <a href="#features">Возможности</a>
-    <a href="#pricing">Тариф</a>
-    <a class="nav-cta" href="#pricing">Демо 3 мин</a>
+    <a href="#how" data-i18n="nav_how">Как работает</a>
+    <a href="#features" data-i18n="nav_features">Возможности</a>
+    <a href="#pricing" data-i18n="nav_pricing">Тариф</a>
+    <a class="nav-cta" href="#pricing" data-i18n="nav_cta">Демо 3 мин</a>
+    <div class="lang" role="group" aria-label="Тіл / Язык">
+      <button type="button" data-lang="kk" aria-pressed="false">KZ</button>
+      <button type="button" data-lang="ru" aria-pressed="true">RU</button>
+    </div>
   </nav>
 </header>
 
@@ -392,19 +431,19 @@ footer a:hover { color: var(--lime); }
 
   <section class="hero" style="border-top: none;">
     <div class="wrap">
-      <p class="mono rise"><span class="tick">◆</span> Adobe Premiere Pro · Қазақ тілі</p>
-      <h1 class="rise">Premiere не понимает казахский.<br><span class="lime">NP SUB</span> понимает.</h1>
-      <p class="lead rise">Плагин распознаёт казахскую речь и раскладывает субтитры прямо на таймлайн — с тайм-кодами, без экспорта, без сторонних сервисов и без ручного набора.</p>
+      <p class="mono rise"><span class="tick">◆</span> <span data-i18n="hero_kicker">Adobe Premiere Pro · Қазақ тілі</span></p>
+      <h1 class="rise" data-i18n-html="hero_h1">Premiere не понимает казахский.<br><span class="lime">NP SUB</span> понимает.</h1>
+      <p class="lead rise" data-i18n="hero_lead">Плагин распознаёт казахскую речь и раскладывает субтитры прямо на таймлайн — с тайм-кодами, без экспорта, без сторонних сервисов и без ручного набора.</p>
       <div class="hero-actions rise">
-        <a class="btn btn-primary" href="#pricing">Взять демо — 3 минуты</a>
-        <a class="btn btn-ghost" href="#how">Как это работает</a>
+        <a class="btn btn-primary" href="#pricing" data-i18n="hero_cta">Взять демо — 3 минуты</a>
+        <a class="btn btn-ghost" href="#how" data-i18n="hero_cta2">Как это работает</a>
       </div>
-      <p class="hero-note rise" style="margin-top:18px;">Windows и macOS · Установка в один клик · Оплата Kaspi</p>
+      <p class="hero-note rise" style="margin-top:16px;" data-i18n="hero_note">Windows и macOS · Установка в один клик · Оплата Kaspi</p>
       <div class="ruler" aria-hidden="true"></div>
       <div class="stats rise">
-        <div class="stat"><b>~2 мин</b><span>обработка 10-минутного ролика</span></div>
-        <div class="stat"><b>3 мин</b><span>бесплатно, без карты</span></div>
-        <div class="stat"><b>1 490 ₸</b><span>полный доступ</span></div>
+        <div class="stat"><b data-i18n="stat1_v">~2 мин</b><span data-i18n="stat1_l">обработка 10-минутного ролика</span></div>
+        <div class="stat"><b data-i18n="stat2_v">3 мин</b><span data-i18n="stat2_l">бесплатно, без карты</span></div>
+        <div class="stat"><b data-i18n="stat3_v">1 490 ₸</b><span data-i18n="stat3_l">полный доступ</span></div>
       </div>
     </div>
   </section>
@@ -412,18 +451,18 @@ footer a:hover { color: var(--lime); }
   <section id="problem">
     <div class="wrap">
       <div class="sec-head rise">
-        <p class="mono"><span class="tick">01</span> Проблема</p>
-        <h2>Автоматические субтитры Premiere казахский не распознают.</h2>
-        <p class="lead">Поэтому казахоязычный монтажёр либо набирает реплики руками, либо гоняет ролик через чужие сервисы и потом вручную сводит тайм-коды.</p>
+        <p class="mono"><span class="tick">01</span> <span data-i18n="s1_kicker">Проблема</span></p>
+        <h2 data-i18n="s1_h2">Автоматические субтитры Premiere казахский не распознают.</h2>
+        <p class="lead" data-i18n="s1_lead">Поэтому казахоязычный монтажёр либо набирает реплики руками, либо гоняет ролик через чужие сервисы и потом вручную сводит тайм-коды.</p>
       </div>
       <div class="split rise">
         <div class="bad">
-          <h3>Как сейчас</h3>
-          <p>Экспорт аудио → загрузка в сторонний сервис → скачивание файла → импорт → правка тайм-кодов. Час работы на десятиминутный ролик, и так каждый раз.</p>
+          <h3 data-i18n="s1_bad_h">Как сейчас</h3>
+          <p data-i18n="s1_bad_p">Экспорт видео → загрузка в CapCut или другой сторонний сервис → скачивание файла → импорт обратно. А если приходят правки — весь процесс повторяется заново.</p>
         </div>
         <div class="good">
-          <h3>С NP SUB</h3>
-          <p>Открыть панель в Premiere, нажать одну кнопку. Через пару минут субтитры уже стоят на таймлайне — остаётся вычитать текст.</p>
+          <h3 data-i18n="s1_good_h">С NP SUB</h3>
+          <p data-i18n="s1_good_p">Открыть панель в Premiere, нажать одну кнопку. Через пару минут субтитры уже стоят на таймлайне — остаётся вычитать текст.</p>
         </div>
       </div>
     </div>
@@ -432,24 +471,24 @@ footer a:hover { color: var(--lime); }
   <section id="how">
     <div class="wrap">
       <div class="sec-head rise">
-        <p class="mono"><span class="tick">02</span> Как работает</p>
-        <h2>Три шага. Дальше — обычный монтаж.</h2>
+        <p class="mono"><span class="tick">02</span> <span data-i18n="s2_kicker">Как работает</span></p>
+        <h2 data-i18n="s2_h2">Три шага. Дальше — обычный монтаж.</h2>
       </div>
       <div class="steps">
         <div class="step rise">
           <span class="step-n">01</span>
-          <h3>Установить панель</h3>
-          <p>Установщик для Windows и macOS делает всё сам — в реестре и настройках ковыряться не нужно. Панель появляется в меню «Окно» Premiere Pro.</p>
+          <h3 data-i18n="s2_1h">Установить панель</h3>
+          <p data-i18n="s2_1p">Установщик для Windows и macOS делает всё сам — в реестре и настройках ковыряться не нужно. Панель появляется в меню «Окно» Premiere Pro.</p>
         </div>
         <div class="step rise">
           <span class="step-n">02</span>
-          <h3>Нажать кнопку</h3>
-          <p>Панель сама берёт звук из активной секвенции. Ничего экспортировать и никуда загружать вручную не надо.</p>
+          <h3 data-i18n="s2_2h">Нажать кнопку</h3>
+          <p data-i18n="s2_2p">Панель сама берёт звук из активной секвенции. Ничего экспортировать и никуда загружать вручную не надо.</p>
         </div>
         <div class="step rise">
           <span class="step-n">03</span>
-          <h3>Получить субтитры</h3>
-          <p>Реплики приходят на таймлайн с готовыми тайм-кодами — в караоке-режиме по словам или обычными фразами.</p>
+          <h3 data-i18n="s2_3h">Получить субтитры</h3>
+          <p data-i18n="s2_3p">Реплики приходят на таймлайн с готовыми тайм-кодами — в караоке-режиме по словам или обычными фразами.</p>
         </div>
       </div>
     </div>
@@ -458,19 +497,21 @@ footer a:hover { color: var(--lime); }
   <section id="demo">
     <div class="wrap">
       <div class="sec-head rise">
-        <p class="mono"><span class="tick">03</span> Что получается</p>
-        <h2>Живая казахская речь — вместе с русскими вставками.</h2>
-        <p class="lead">Разговорный казахский почти всегда смешанный. NP SUB пишет русские слова по-русски, а не «оказашивает» их.</p>
+        <p class="mono"><span class="tick">03</span> <span data-i18n="s3_kicker">Что получается</span></p>
+        <h2 data-i18n="s3_h2">Живая казахская речь — вместе с русскими вставками.</h2>
+        <p class="lead" data-i18n="s3_lead">Разговорный казахский почти всегда смешанный. NP SUB пишет русские слова по-русски, а не «оказашивает» их.</p>
       </div>
       <div class="demo rise">
         <div class="demo-bar">
           <span class="dot" aria-hidden="true"></span>
           <span class="mono" style="letter-spacing:0.1em;">sequence_01.srt</span>
         </div>
-        <pre><span class="tc">00:00:01,240 → 00:00:03,010</span>  Бүгін, <span class="ru">кстати</span>, қызық болды
+        <div class="demo-scroll">
+          <pre><span class="tc">00:00:01,240 → 00:00:03,010</span>  Бүгін, <span class="ru">кстати</span>, қызық болды
 <span class="tc">00:00:03,010 → 00:00:05,480</span>  Монтаж дайын, <span class="ru">и всё готово</span>
 <span class="tc">00:00:05,480 → 00:00:07,900</span>  <span class="ru">Короче</span>, жалғастырамыз</pre>
-        <p class="demo-note">Формат — обычный <span class="mono" style="font-size:13px; text-transform:none; letter-spacing:0;">.srt</span>, поэтому субтитры остаются вашими: их можно править, стилизовать и переносить куда угодно.</p>
+        </div>
+        <p class="demo-note" data-i18n-html="s3_note">Формат — обычный <span class="mono" style="font-size:13px; text-transform:none; letter-spacing:0;">.srt</span>, поэтому субтитры остаются вашими: их можно править, стилизовать и переносить куда угодно.</p>
       </div>
     </div>
   </section>
@@ -478,39 +519,39 @@ footer a:hover { color: var(--lime); }
   <section id="features">
     <div class="wrap">
       <div class="sec-head rise">
-        <p class="mono"><span class="tick">04</span> Возможности</p>
-        <h2>Сделано под казахский, а не переведено на него.</h2>
+        <p class="mono"><span class="tick">04</span> <span data-i18n="s4_kicker">Возможности</span></p>
+        <h2 data-i18n="s4_h2">Сделано под казахский, а не переведено на него.</h2>
       </div>
       <div class="grid">
         <div class="card rise">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12h3l2-5 3 10 3-8 2 3h5"/></svg>
-          <h3>Казахская речь</h3>
-          <p>Модель работает именно с казахским: специфические звуки, окончания и разговорный темп — не побочный режим общей мультиязычной системы.</p>
+          <h3 data-i18n="f1h">Казахская речь</h3>
+          <p data-i18n="f1p">Модель работает именно с казахским: специфические звуки, окончания и разговорный темп — не побочный режим общей мультиязычной системы.</p>
         </div>
         <div class="card rise">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h13"/><rect x="17" y="9" width="4" height="6"/></svg>
-          <h3>Караоке или фразы</h3>
-          <p>Пословный режим для динамичных вертикальных роликов и обычные реплики-фразы для интервью и влогов — переключается в панели.</p>
+          <h3 data-i18n="f2h">Караоке или фразы</h3>
+          <p data-i18n="f2p">Пословный режим для динамичных вертикальных роликов и обычные реплики-фразы для интервью и влогов — переключается в панели.</p>
         </div>
         <div class="card rise">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>
-          <h3>Точные тайм-коды</h3>
-          <p>Реплики привязаны к речи, а не расставлены равномерно. Меньше правок вручную после того, как субтитры уже на таймлайне.</p>
+          <h3 data-i18n="f3h">Точные тайм-коды</h3>
+          <p data-i18n="f3p">Реплики привязаны к речи, а не расставлены равномерно. Меньше правок вручную после того, как субтитры уже на таймлайне.</p>
         </div>
         <div class="card rise">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 4h14v16l-7-4-7 4z"/></svg>
-          <h3>Словарь правок</h3>
-          <p>Частые ошибки в русских вставках и именах чинятся на сервере — исправления приезжают ко всем сразу, переустанавливать плагин не нужно.</p>
+          <h3 data-i18n="f4h">Словарь правок</h3>
+          <p data-i18n="f4p">Частые ошибки в русских вставках и именах чинятся на сервере — исправления приезжают ко всем сразу, переустанавливать плагин не нужно.</p>
         </div>
         <div class="card rise">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3v13"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>
-          <h3>Ролики до 10 минут</h3>
-          <p>Длинное аудио режется и обрабатывается параллельно, поэтому десятиминутный ролик занимает пару минут, а не пару часов.</p>
+          <h3 data-i18n="f5h">Ролики до 10 минут</h3>
+          <p data-i18n="f5p">Длинное аудио режется и обрабатывается параллельно, поэтому десятиминутный ролик занимает пару минут, а не пару часов.</p>
         </div>
         <div class="card rise">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="4" y="10" width="16" height="10"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
-          <h3>Видео остаётся у вас</h3>
-          <p>На сервер уходит только звуковая дорожка для распознавания. Само видео никуда не загружается и не хранится.</p>
+          <h3 data-i18n="f6h">Видео остаётся у вас</h3>
+          <p data-i18n="f6p">На сервер уходит только звуковая дорожка для распознавания. Само видео никуда не загружается и не хранится.</p>
         </div>
       </div>
     </div>
@@ -519,33 +560,33 @@ footer a:hover { color: var(--lime); }
   <section id="pricing">
     <div class="wrap">
       <div class="sec-head rise">
-        <p class="mono"><span class="tick">05</span> Тариф</p>
-        <h2>Один платный тариф. Без подписочных лабиринтов.</h2>
-        <p class="lead">Сначала попробуйте на своём ролике — демо выдаётся сразу и не требует карты.</p>
+        <p class="mono"><span class="tick">05</span> <span data-i18n="s5_kicker">Тариф</span></p>
+        <h2 data-i18n="s5_h2">Один платный тариф. Без подписочных лабиринтов.</h2>
+        <p class="lead" data-i18n="s5_lead">Сначала попробуйте на своём ролике — демо выдаётся сразу и не требует карты.</p>
       </div>
       <div class="plans rise">
         <div class="plan">
           <span class="plan-name">Demo</span>
-          <p class="price">0 ₸</p>
-          <p class="price-note">3 минуты аудио, без срока действия</p>
+          <p class="price" data-i18n="p1_price">0 ₸</p>
+          <p class="price-note" data-i18n="p1_note">3 минуты аудио, без срока действия</p>
           <ul>
-            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>Полное качество распознавания</li>
-            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>Выдаётся мгновенно в Telegram</li>
-            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>Без карты и без автосписаний</li>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg><span data-i18n="p1_1">Полное качество распознавания</span></li>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg><span data-i18n="p1_2">Выдаётся мгновенно в Telegram</span></li>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg><span data-i18n="p1_3">Без карты и без автосписаний</span></li>
           </ul>
-          <a class="btn btn-ghost" href="#" data-bot>Получить демо-ключ</a>
+          <a class="btn btn-ghost" href="#" data-bot data-i18n="p1_cta">Получить демо-ключ</a>
         </div>
         <div class="plan featured">
           <span class="plan-name">Standard</span>
-          <p class="price">1 490 ₸</p>
-          <p class="price-note">60 минут аудио или 30 дней — что закончится раньше</p>
+          <p class="price" data-i18n="p2_price">1 490 ₸</p>
+          <p class="price-note" data-i18n="p2_note">60 минут аудио или 30 дней — что закончится раньше</p>
           <ul>
-            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>60 минут распознавания</li>
-            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>Работает на двух устройствах по одному ключу</li>
-            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>Оплата Kaspi, ключ приходит в Telegram</li>
-            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>Остаток минут виден прямо в панели</li>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg><span data-i18n="p2_1">60 минут распознавания</span></li>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg><span data-i18n="p2_2">Работает на двух устройствах по одному ключу</span></li>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg><span data-i18n="p2_3">Оплата Kaspi, ключ приходит в Telegram</span></li>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg><span data-i18n="p2_4">Остаток минут виден прямо в панели</span></li>
           </ul>
-          <a class="btn btn-primary" href="#" data-bot>Купить доступ</a>
+          <a class="btn btn-primary" href="#" data-bot data-i18n="p2_cta">Купить доступ</a>
         </div>
       </div>
     </div>
@@ -554,29 +595,29 @@ footer a:hover { color: var(--lime); }
   <section id="faq">
     <div class="wrap">
       <div class="sec-head rise">
-        <p class="mono"><span class="tick">06</span> Вопросы</p>
-        <h2>Коротко о главном.</h2>
+        <p class="mono"><span class="tick">06</span> <span data-i18n="s6_kicker">Вопросы</span></p>
+        <h2 data-i18n="s6_h2">Коротко о главном.</h2>
       </div>
       <div class="faq rise">
         <details>
-          <summary>Какие версии Premiere Pro поддерживаются?</summary>
-          <p>Панель ставится во все версии Premiere Pro, где есть расширения CEP — это Premiere Pro 2020 (версия 14.0) и новее, на Windows и macOS. Установщик сам находит установленные версии и настраивает их.</p>
+          <summary><span data-i18n="q1">Какие версии Premiere Pro поддерживаются?</span></summary>
+          <p data-i18n="a1">Панель ставится во все версии Premiere Pro, где есть расширения CEP — это Premiere Pro 2020 (версия 14.0) и новее, на Windows и macOS. Установщик сам находит установленные версии и настраивает их.</p>
         </details>
         <details>
-          <summary>Куда уходит моё видео?</summary>
-          <p>Никуда. Панель извлекает только звуковую дорожку и отправляет на распознавание её. Видеофайл остаётся на вашем компьютере.</p>
+          <summary><span data-i18n="q2">Куда уходит моё видео?</span></summary>
+          <p data-i18n="a2">Никуда. Панель извлекает только звуковую дорожку и отправляет на распознавание её. Видеофайл остаётся на вашем компьютере.</p>
         </details>
         <details>
-          <summary>Насколько точно распознавание?</summary>
-          <p>Достаточно точно, чтобы не набирать субтитры с нуля: вы получаете готовую раскладку по тайм-кодам и вычитываете текст. Полностью безошибочного распознавания казахской разговорной речи сегодня не даёт никто — мы честно говорим, что вычитка нужна.</p>
+          <summary><span data-i18n="q3">Насколько точно распознавание?</span></summary>
+          <p data-i18n="a3">Достаточно точно, чтобы не набирать субтитры с нуля: вы получаете готовую раскладку по тайм-кодам и вычитываете текст. Полностью безошибочного распознавания казахской разговорной речи сегодня не даёт никто — мы честно говорим, что вычитка нужна.</p>
         </details>
         <details>
-          <summary>Что будет, когда закончатся минуты?</summary>
-          <p>Бот заранее предупредит, что остаток подходит к концу, и пришлёт ссылку на продление. Остаток минут всегда виден в самой панели.</p>
+          <summary><span data-i18n="q4">Что будет, когда закончатся минуты?</span></summary>
+          <p data-i18n="a4">Бот заранее предупредит, что остаток подходит к концу, и пришлёт ссылку на продление. Остаток минут всегда виден в самой панели.</p>
         </details>
         <details>
-          <summary>Как оплатить?</summary>
-          <p>Переводом Kaspi. После подтверждения оплаты бот сам выдаёт ключ в том же чате — ждать ответа менеджера отдельно не нужно.</p>
+          <summary><span data-i18n="q5">Как оплатить?</span></summary>
+          <p data-i18n="a5">Переводом Kaspi. После подтверждения оплаты бот сам выдаёт ключ в том же чате — ждать ответа менеджера отдельно не нужно.</p>
         </details>
       </div>
     </div>
@@ -584,32 +625,259 @@ footer a:hover { color: var(--lime); }
 
   <section class="final">
     <div class="wrap">
-      <p class="mono rise"><span class="tick">◆</span> Тегін көріңіз</p>
-      <h2 class="rise">Проверьте на своём ролике за три минуты.</h2>
-      <p class="lead rise">Демо-ключ выдаётся сразу и ничего не стоит. Если субтитры вам не подойдут — вы просто ничего не заплатите.</p>
-      <p class="rise"><a class="btn btn-primary" href="#" data-bot>Взять демо в Telegram</a></p>
+      <p class="mono rise"><span class="tick">◆</span> <span data-i18n="fin_kicker">Тегін көріңіз</span></p>
+      <h2 class="rise" data-i18n="fin_h2">Проверьте на своём ролике за три минуты.</h2>
+      <p class="lead rise" data-i18n="fin_lead">Демо-ключ выдаётся сразу и ничего не стоит. Если субтитры вам не подойдут — вы просто ничего не заплатите.</p>
+      <p class="rise"><a class="btn btn-primary" href="#" data-bot data-i18n="fin_cta">Взять демо в Telegram</a></p>
     </div>
   </section>
 
 </main>
 
 <footer>
-  <span>NP SUB · Қазақша субтитрлер</span>
-  <span><a href="#" data-bot>Telegram</a> · <a href="mailto:poozjkee@gmail.com">Почта</a></span>
+  <span data-i18n="foot_1">NP SUB · Қазақша субтитрлер</span>
+  <span><a href="#" data-bot>Telegram</a> · <a href="mailto:poozjkee@gmail.com">poozjkee@gmail.com</a></span>
 </footer>
 
-<script>
-/*
- * Ссылка на бота задаётся в одном месте: подставьте адрес своего бота вместо
- * BOT_URL, и все кнопки на странице обновятся разом.
- */
-var BOT_URL = "https://t.me/";
+<div class="dock" id="dock">
+  <a class="btn btn-primary" href="#" data-bot data-i18n="dock_cta">Взять демо — 3 минуты</a>
+</div>
 
+<script>
+/* Адрес бота задаётся здесь один раз — все кнопки страницы берут его отсюда. */
+var BOT_URL = "https://t.me/np_subbot";
+
+/*
+ * Словарь. Русский лежит прямо в разметке (он же и запасной вариант),
+ * здесь — казахский и русские строки для обратного переключения.
+ * Ключи с пометкой _html содержат разметку и подставляются как HTML.
+ */
+var I18N = {
+  kk: {
+    title: "NP SUB — Premiere Pro-да қазақша субтитрлер",
+    nav_how: "Қалай жұмыс істейді", nav_features: "Мүмкіндіктер",
+    nav_pricing: "Тариф", nav_cta: "Демо 3 мин",
+
+    hero_kicker: "Adobe Premiere Pro · Қазақ тілі",
+    hero_h1: "Premiere қазақшаны түсінбейді.<br><span class=\"lime\">NP SUB</span> түсінеді.",
+    hero_lead: "Плагин қазақ тіліндегі сөзді танып, субтитрлерді тікелей таймлайнға қояды — тайм-кодтарымен, экспортсыз, бөгде сервистерсіз және қолмен терусіз.",
+    hero_cta: "Демо алу — 3 минут", hero_cta2: "Қалай жұмыс істейді",
+    hero_note: "Windows және macOS · Бір рет басып орнату · Kaspi арқылы төлем",
+
+    stat1_v: "~2 мин", stat1_l: "10 минуттық роликті өңдеу",
+    stat2_v: "3 мин", stat2_l: "тегін, картасыз",
+    stat3_v: "1 490 ₸", stat3_l: "толық қолжетімділік",
+
+    s1_kicker: "Мәселе",
+    s1_h2: "Premiere-дің автоматты субтитрлері қазақшаны танымайды.",
+    s1_lead: "Сондықтан қазақтілді монтаждаушы не барлық сөзді қолмен тереді, не роликті бөгде сервистерге салып, тайм-кодтарды қайтадан келтіреді.",
+    s1_bad_h: "Қазіргі жағдай",
+    s1_bad_p: "Видеоны экспорттау → CapCut-қа немесе басқа бөгде сервиске жүктеу → файлды жүктеп алу → кері импорттау. Ал түзету келсе — бүкіл процесс қайтадан басталады.",
+    s1_good_h: "NP SUB-пен",
+    s1_good_p: "Premiere-де панельді ашып, бір батырманы басасыз. Бірер минуттан кейін субтитрлер таймлайнда тұрады — тек мәтінді оқып шығу қалады.",
+
+    s2_kicker: "Қалай жұмыс істейді",
+    s2_h2: "Үш қадам. Әрі қарай — әдеттегі монтаж.",
+    s2_1h: "Панельді орнату",
+    s2_1p: "Windows пен macOS-қа арналған орнатқыш бәрін өзі жасайды — тізілімді өзгертудің қажеті жоқ. Панель Premiere Pro-ның «Window» мәзірінде пайда болады.",
+    s2_2h: "Батырманы басу",
+    s2_2p: "Панель дыбысты белсенді секвенциядан өзі алады. Ештеңені экспорттап, қолмен жүктеудің қажеті жоқ.",
+    s2_3h: "Субтитрлерді алу",
+    s2_3p: "Репликалар таймлайнға дайын тайм-кодтарымен түседі — сөзбе-сөз караоке режимінде немесе әдеттегі сөйлемдермен.",
+
+    s3_kicker: "Нәтиже",
+    s3_h2: "Тірі қазақ тілі — орысша кірме сөздерімен бірге.",
+    s3_lead: "Ауызекі қазақ тілі әрдайым дерлік аралас. NP SUB орысша сөздерді орысша жазады, оларды «қазақшаламайды».",
+    s3_note: "Формат — кәдімгі <span class=\"mono\" style=\"font-size:13px; text-transform:none; letter-spacing:0;\">.srt</span>, сондықтан субтитрлер сіздікі болып қала береді: оларды түзетуге, безендіруге және кез келген жерге көшіруге болады.",
+
+    s4_kicker: "Мүмкіндіктер",
+    s4_h2: "Қазақ тіліне аударылған емес — қазақ тілі үшін жасалған.",
+    f1h: "Қазақ тілі",
+    f1p: "Модель нақ қазақ тілімен жұмыс істейді: тән дыбыстар, жалғаулар және ауызекі қарқын — жалпы көптілді жүйенің қосалқы режимі емес.",
+    f2h: "Караоке немесе сөйлем",
+    f2p: "Тік әрі динамикалық роликтерге — сөзбе-сөз режим, сұхбат пен влогқа — әдеттегі сөйлемдер. Панельде ауыстырылады.",
+    f3h: "Дәл тайм-кодтар",
+    f3p: "Репликалар біркелкі таратылмай, нақты сөзге байланады. Субтитрлер таймлайнға түскен соң қолмен түзету азаяды.",
+    f4h: "Түзетулер сөздігі",
+    f4p: "Орысша кірме сөздер мен есімдердегі жиі қателер серверде түзетіледі — түзету бәріне бірден жетеді, плагинді қайта орнатудың қажеті жоқ.",
+    f5h: "10 минутқа дейінгі роликтер",
+    f5p: "Ұзын дыбыс бөліктерге бөлініп, қатар өңделеді. Сондықтан он минуттық ролик бірер минут алады, бірер сағат емес.",
+    f6h: "Видео сізде қалады",
+    f6p: "Серверге тек тану үшін қажет дыбыс жолағы жіберіледі. Видеоның өзі ешқайда жүктелмейді және сақталмайды.",
+
+    s5_kicker: "Тариф",
+    s5_h2: "Бір ғана ақылы тариф. Шатастыратын жазылымдарсыз.",
+    s5_lead: "Алдымен өз ролигіңізде байқап көріңіз — демо бірден беріледі және карта сұралмайды.",
+    p1_price: "0 ₸", p1_note: "3 минут дыбыс, мерзімсіз",
+    p1_1: "Тану сапасы толық көлемде",
+    p1_2: "Telegram-да лезде беріледі",
+    p1_3: "Картасыз, автоматты шегерімсіз",
+    p1_cta: "Демо кілт алу",
+    p2_price: "1 490 ₸", p2_note: "60 минут дыбыс немесе 30 күн — қайсысы бұрын бітсе",
+    p2_1: "60 минут тану",
+    p2_2: "Бір кілт екі құрылғыда жұмыс істейді",
+    p2_3: "Kaspi арқылы төлем, кілт Telegram-ға келеді",
+    p2_4: "Қалған минут панельде көрініп тұрады",
+    p2_cta: "Қолжетімділік сатып алу",
+
+    s6_kicker: "Сұрақтар", s6_h2: "Ең бастысы — қысқаша.",
+    q1: "Premiere Pro-ның қандай нұсқалары қолдау табады?",
+    a1: "Панель CEP кеңейтімдері бар барлық нұсқаға орнатылады — бұл Premiere Pro 2020 (14.0 нұсқасы) және одан жаңалары, Windows пен macOS-та. Орнатқыш орнатылған нұсқаларды өзі тауып, баптайды.",
+    q2: "Менің видеом қайда кетеді?",
+    a2: "Ешқайда. Панель тек дыбыс жолағын бөліп алып, тануға соны жібереді. Видеофайл сіздің компьютеріңізде қалады.",
+    q3: "Тану қаншалықты дәл?",
+    a3: "Субтитрлерді нөлден теруге тура келмейтіндей дәл: сіз тайм-кодтары дайын мәтінді алып, оны тек оқып шығасыз. Ауызекі қазақ тілін мүлдем қатесіз тану бүгінде ешкімде жоқ — мәтінді тексеру керектігін ашық айтамыз.",
+    q4: "Минут біткенде не болады?",
+    a4: "Бот қалған уақыт азайғанын алдын ала ескертіп, ұзарту сілтемесін жібереді. Қалған минут панельде әрқашан көрініп тұрады.",
+    q5: "Қалай төлеймін?",
+    a5: "Kaspi аударымымен. Төлем расталған соң бот кілтті сол чатта өзі береді — менеджердің жауабын бөлек күтудің қажеті жоқ.",
+
+    fin_kicker: "Тегін көріңіз",
+    fin_h2: "Өз ролигіңізде үш минутта тексеріп көріңіз.",
+    fin_lead: "Демо кілт бірден беріледі және тегін. Субтитрлер ұнамаса — ештеңе төлемейсіз.",
+    fin_cta: "Telegram-нан демо алу",
+    dock_cta: "Демо алу — 3 минут",
+    foot_1: "NP SUB · Қазақша субтитрлер"
+  },
+  ru: {
+    title: "NP SUB — қазақша субтитры прямо в Premiere Pro",
+    nav_how: "Как работает", nav_features: "Возможности",
+    nav_pricing: "Тариф", nav_cta: "Демо 3 мин",
+
+    hero_kicker: "Adobe Premiere Pro · Қазақ тілі",
+    hero_h1: "Premiere не понимает казахский.<br><span class=\"lime\">NP SUB</span> понимает.",
+    hero_lead: "Плагин распознаёт казахскую речь и раскладывает субтитры прямо на таймлайн — с тайм-кодами, без экспорта, без сторонних сервисов и без ручного набора.",
+    hero_cta: "Взять демо — 3 минуты", hero_cta2: "Как это работает",
+    hero_note: "Windows и macOS · Установка в один клик · Оплата Kaspi",
+
+    stat1_v: "~2 мин", stat1_l: "обработка 10-минутного ролика",
+    stat2_v: "3 мин", stat2_l: "бесплатно, без карты",
+    stat3_v: "1 490 ₸", stat3_l: "полный доступ",
+
+    s1_kicker: "Проблема",
+    s1_h2: "Автоматические субтитры Premiere казахский не распознают.",
+    s1_lead: "Поэтому казахоязычный монтажёр либо набирает реплики руками, либо гоняет ролик через чужие сервисы и потом вручную сводит тайм-коды.",
+    s1_bad_h: "Как сейчас",
+    s1_bad_p: "Экспорт видео → загрузка в CapCut или другой сторонний сервис → скачивание файла → импорт обратно. А если приходят правки — весь процесс повторяется заново.",
+    s1_good_h: "С NP SUB",
+    s1_good_p: "Открыть панель в Premiere, нажать одну кнопку. Через пару минут субтитры уже стоят на таймлайне — остаётся вычитать текст.",
+
+    s2_kicker: "Как работает",
+    s2_h2: "Три шага. Дальше — обычный монтаж.",
+    s2_1h: "Установить панель",
+    s2_1p: "Установщик для Windows и macOS делает всё сам — в реестре и настройках ковыряться не нужно. Панель появляется в меню «Окно» Premiere Pro.",
+    s2_2h: "Нажать кнопку",
+    s2_2p: "Панель сама берёт звук из активной секвенции. Ничего экспортировать и никуда загружать вручную не надо.",
+    s2_3h: "Получить субтитры",
+    s2_3p: "Реплики приходят на таймлайн с готовыми тайм-кодами — в караоке-режиме по словам или обычными фразами.",
+
+    s3_kicker: "Что получается",
+    s3_h2: "Живая казахская речь — вместе с русскими вставками.",
+    s3_lead: "Разговорный казахский почти всегда смешанный. NP SUB пишет русские слова по-русски, а не «оказашивает» их.",
+    s3_note: "Формат — обычный <span class=\"mono\" style=\"font-size:13px; text-transform:none; letter-spacing:0;\">.srt</span>, поэтому субтитры остаются вашими: их можно править, стилизовать и переносить куда угодно.",
+
+    s4_kicker: "Возможности",
+    s4_h2: "Сделано под казахский, а не переведено на него.",
+    f1h: "Казахская речь",
+    f1p: "Модель работает именно с казахским: специфические звуки, окончания и разговорный темп — не побочный режим общей мультиязычной системы.",
+    f2h: "Караоке или фразы",
+    f2p: "Пословный режим для динамичных вертикальных роликов и обычные реплики-фразы для интервью и влогов — переключается в панели.",
+    f3h: "Точные тайм-коды",
+    f3p: "Реплики привязаны к речи, а не расставлены равномерно. Меньше правок вручную после того, как субтитры уже на таймлайне.",
+    f4h: "Словарь правок",
+    f4p: "Частые ошибки в русских вставках и именах чинятся на сервере — исправления приезжают ко всем сразу, переустанавливать плагин не нужно.",
+    f5h: "Ролики до 10 минут",
+    f5p: "Длинное аудио режется и обрабатывается параллельно, поэтому десятиминутный ролик занимает пару минут, а не пару часов.",
+    f6h: "Видео остаётся у вас",
+    f6p: "На сервер уходит только звуковая дорожка для распознавания. Само видео никуда не загружается и не хранится.",
+
+    s5_kicker: "Тариф",
+    s5_h2: "Один платный тариф. Без подписочных лабиринтов.",
+    s5_lead: "Сначала попробуйте на своём ролике — демо выдаётся сразу и не требует карты.",
+    p1_price: "0 ₸", p1_note: "3 минуты аудио, без срока действия",
+    p1_1: "Полное качество распознавания",
+    p1_2: "Выдаётся мгновенно в Telegram",
+    p1_3: "Без карты и без автосписаний",
+    p1_cta: "Получить демо-ключ",
+    p2_price: "1 490 ₸", p2_note: "60 минут аудио или 30 дней — что закончится раньше",
+    p2_1: "60 минут распознавания",
+    p2_2: "Работает на двух устройствах по одному ключу",
+    p2_3: "Оплата Kaspi, ключ приходит в Telegram",
+    p2_4: "Остаток минут виден прямо в панели",
+    p2_cta: "Купить доступ",
+
+    s6_kicker: "Вопросы", s6_h2: "Коротко о главном.",
+    q1: "Какие версии Premiere Pro поддерживаются?",
+    a1: "Панель ставится во все версии Premiere Pro, где есть расширения CEP — это Premiere Pro 2020 (версия 14.0) и новее, на Windows и macOS. Установщик сам находит установленные версии и настраивает их.",
+    q2: "Куда уходит моё видео?",
+    a2: "Никуда. Панель извлекает только звуковую дорожку и отправляет на распознавание её. Видеофайл остаётся на вашем компьютере.",
+    q3: "Насколько точно распознавание?",
+    a3: "Достаточно точно, чтобы не набирать субтитры с нуля: вы получаете готовую раскладку по тайм-кодам и вычитываете текст. Полностью безошибочного распознавания казахской разговорной речи сегодня не даёт никто — мы честно говорим, что вычитка нужна.",
+    q4: "Что будет, когда закончатся минуты?",
+    a4: "Бот заранее предупредит, что остаток подходит к концу, и пришлёт ссылку на продление. Остаток минут всегда виден в самой панели.",
+    q5: "Как оплатить?",
+    a5: "Переводом Kaspi. После подтверждения оплаты бот сам выдаёт ключ в том же чате — ждать ответа менеджера отдельно не нужно.",
+
+    fin_kicker: "Тегін көріңіз",
+    fin_h2: "Проверьте на своём ролике за три минуты.",
+    fin_lead: "Демо-ключ выдаётся сразу и ничего не стоит. Если субтитры вам не подойдут — вы просто ничего не заплатите.",
+    fin_cta: "Взять демо в Telegram",
+    dock_cta: "Взять демо — 3 минуты",
+    foot_1: "NP SUB · Қазақша субтитрлер"
+  }
+};
+
+(function () {
+  var buttons = document.querySelectorAll('.lang button');
+
+  function apply(lang) {
+    var dict = I18N[lang];
+    if (!dict) return;
+
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+      var v = dict[el.getAttribute('data-i18n')];
+      if (v != null) el.textContent = v;
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(function (el) {
+      var v = dict[el.getAttribute('data-i18n-html')];
+      if (v != null) el.innerHTML = v;
+    });
+
+    document.documentElement.lang = lang;
+    if (dict.title) document.title = dict.title;
+    buttons.forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-lang') === lang));
+    });
+    try { localStorage.setItem('npsub-lang', lang); } catch (e) {}
+  }
+
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function () { apply(b.getAttribute('data-lang')); });
+  });
+
+  // Сохранённый выбор важнее языка браузера: человек уже решил за себя.
+  var saved = null;
+  try { saved = localStorage.getItem('npsub-lang'); } catch (e) {}
+  var byBrowser = (navigator.language || '').slice(0, 2) === 'kk' ? 'kk' : 'ru';
+  apply(I18N[saved] ? saved : byBrowser);
+})();
+
+/* Ссылки на бота — из одной константы наверху. */
 document.querySelectorAll('[data-bot]').forEach(function (a) {
   a.setAttribute('href', BOT_URL);
   a.setAttribute('target', '_blank');
   a.setAttribute('rel', 'noopener');
 });
+
+/* Нижняя панель на телефоне: показываем, когда первый экран уже позади. */
+(function () {
+  var dock = document.getElementById('dock');
+  var hero = document.querySelector('.hero');
+  if (!dock || !hero || !('IntersectionObserver' in window)) return;
+  new IntersectionObserver(function (entries) {
+    dock.classList.toggle('show', !entries[0].isIntersecting);
+  }, { threshold: 0 }).observe(hero);
+})();
 
 /* Появление блоков при скролле. Без библиотеки: одна задача — один наблюдатель. */
 if ('IntersectionObserver' in window &&
