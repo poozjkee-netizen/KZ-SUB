@@ -14,7 +14,9 @@ Premiere Pro
 NP SUB API (FastAPI)
         │  3. licenses.py: проверка лицензии (ключ/статус/срок/лимит минут)
         │  4. transcribe.py: faster-whisper (kk) → сегменты + пословные тайм-коды
-        │  5. segmentation.py: нарезка в аккуратные реплики (длина/время/паузы)
+        │     (в проде это делает GPU-воркер и отдаёт СЫРЫЕ слова — ADR-15)
+        │  5. segmentation.py: нарезка в реплики; режим приходит из панели
+        │     (word — караоке / phrase — фразы). Всегда на шлюзе
         │  6. srt.py: сегменты → .srt
         ▼
 Premiere Pro

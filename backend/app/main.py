@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
 from . import dataset, events, licenses, notify, telegram_bot
+from .asr_types import RawSegment, raw_from_json
 from .audio_chunk import split_wav_for_runpod
 from .audio_convert import to_16k_mono_wav_bytes
 from .audio_probe import probe_duration_seconds
@@ -44,6 +45,12 @@ def _runpod_transcribe(
 ) -> tuple[list[Segment], float, bytes]:
     """Прокси-режим: конвертирует, при нужде режет на куски и склеивает сегменты.
 
+    Воркер только распознаёт и отдаёт СЫРЫЕ слова — реплики из них собирает
+    шлюз. Так вид субтитров (режим нарезки, длина строки, оформление) правится
+    одним `fly deploy`, а не пересборкой GPU-образа и сменой образа у эндпоинта.
+    Старый воркер флага не знает и присылает уже нарезанное — этот случай
+    распознаётся по отсутствию признака `raw` и обрабатывается по-старому.
+
     Синхронная (urllib внутри) — вызывается через run_in_threadpool одним заходом,
     чтобы весь цикл нарезки шёл вне event loop. Куски гонятся параллельно
     (до chunk_concurrency одновременно), порядок сегментов восстанавливается по
@@ -61,17 +68,34 @@ def _runpod_transcribe(
 
     chunks = split_wav_for_runpod(wav_bytes, settings.chunk_seconds)
 
-    def run_chunk(item: tuple[int, tuple[bytes, float]]) -> tuple[int, list[Segment]]:
+    def run_chunk(
+        item: tuple[int, tuple[bytes, float]],
+    ) -> tuple[int, list[RawSegment], list[Segment]]:
+        """Один кусок аудио -> (сырые сегменты, готовые сегменты).
+
+        Заполнен ровно один из списков: сырые — от нового воркера, готовые —
+        от старого. Тайм-коды сразу сдвигаются на смещение куска в исходном
+        аудио, включая пословные метки.
+        """
         idx, (chunk_bytes, offset) = item
         started = time.monotonic()
-        out = transcribe_via_runpod(chunk_bytes, "json", style)
-        segs = [
-            Segment(float(s["start"]) + offset, float(s["end"]) + offset, str(s["text"]))
-            for s in (out.get("segments") or [])
-        ]
+        out = transcribe_via_runpod(chunk_bytes, "json", style, want_words=True)
+        items = out.get("segments") or []
+
+        raw: list[RawSegment] = []
+        ready: list[Segment] = []
+        if out.get("raw"):
+            raw = raw_from_json(items, offset)
+        else:
+            ready = [
+                Segment(float(s["start"]) + offset, float(s["end"]) + offset, str(s["text"]))
+                for s in items
+            ]
+
         logger.info("Кусок %d/%d: %d сегментов за %.1f c",
-                    idx + 1, len(chunks), len(segs), time.monotonic() - started)
-        return idx, segs
+                    idx + 1, len(chunks), len(raw) + len(ready),
+                    time.monotonic() - started)
+        return idx, raw, ready
 
     t1 = time.monotonic()
     if len(chunks) == 1:
@@ -82,7 +106,28 @@ def _runpod_transcribe(
             results = list(pool.map(run_chunk, enumerate(chunks)))
 
     results.sort(key=lambda r: r[0])          # порядок кусков, а не порядок ответов
-    segments = [seg for _, segs in results for seg in segs]
+    raw_segments = [s for _, raw, _ in results for s in raw]
+
+    if raw_segments:
+        # Новый воркер: собираем реплики здесь — режим приходит из панели.
+        segments = build_captions(
+            raw_segments,
+            style or settings.caption_style,
+            glue_max_chars=settings.glue_max_chars,
+            max_line_chars=settings.max_line_chars,
+            max_lines=settings.max_lines,
+            max_cue_seconds=settings.max_cue_seconds,
+            max_gap_seconds=settings.max_gap_seconds,
+        )
+        segments = apply_style(
+            segments,
+            uppercase=settings.uppercase,
+            strip_punctuation=settings.strip_punctuation,
+            punct_keep=settings.punct_keep,
+        )
+    else:
+        # Старый образ воркера: он уже нарезал и оформил сам.
+        segments = [seg for _, _, ready in results for seg in ready]
 
     # Режим пишем в лог: если субтитры пришли не в том стиле, первый вопрос —
     # дошёл ли выбор до воркера или там стоит старый образ.
@@ -92,6 +137,11 @@ def _runpod_transcribe(
         total_duration, convert_seconds, len(chunks), time.monotonic() - t1,
         len(segments), style or f"(по умолчанию: {settings.caption_style})",
     )
+    if not raw_segments:
+        logger.warning(
+            "Воркер вернул уже нарезанные сегменты — на эндпоинте старый образ, "
+            "выбор режима субтитров в панели не применяется."
+        )
     return segments, total_duration, wav_bytes
 
 

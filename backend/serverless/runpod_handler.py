@@ -8,8 +8,11 @@
     api_key:      ключ KZ-SUB (проверяется как в основном API)
     fmt:          "srt" (по умолчанию) или "json"
     style:        "word" (караоке) / "phrase" (фразы); нет — как в настройках
+    want_words:   true — вернуть СЫРЫЕ сегменты со словами, без нарезки
+                  (её делает шлюз: там правки катятся одним деплоем)
 
 Выход: {"srt": "..."} или {"segments": [...], "duration": ...}
+       при want_words — {"raw": true, "segments": [{..., "words": [...]}], ...}
        либо {"error": "..."} при ошибке.
 
 Деплой: см. docs/HOSTING.md (раздел Runpod Serverless).
@@ -24,6 +27,7 @@ import tempfile
 # app/ лежит уровнем выше (образ собирается из backend/)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from app.asr_types import raw_to_json  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.segmentation import build_captions  # noqa: E402
 from app.srt import segments_to_srt  # noqa: E402
@@ -61,6 +65,18 @@ def handler(job: dict) -> dict:
 
         raw_segments, duration = transcribe_file(tmp_path)
 
+        # Шлюз просит сырые слова: нарезка и оформление переехали к нему, чтобы
+        # правки вида субтитров катились `fly deploy`, а не пересборкой образа.
+        # Признак `raw` явный — по нему шлюз отличает новый воркер от старого.
+        if inp.get("want_words"):
+            return {
+                "raw": True,
+                "language": settings.language,
+                "duration": duration,
+                "segments": raw_to_json(raw_segments),
+            }
+
+        # Ниже — путь для старых панелей/шлюзов: воркер сам режет и оформляет.
         # Режим нарезки выбирает пользователь в панели; шлюз передаёт его сюда.
         # Своё значение из настроек оставляем запасным — на случай старой панели.
         style = (inp.get("style") or settings.caption_style or "").strip()

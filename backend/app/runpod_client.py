@@ -50,15 +50,20 @@ def _request(url: str, payload: dict | None = None) -> dict:
         raise RunpodError(f"Runpod недоступен: {e.reason}") from e
 
 
-def transcribe_via_runpod(audio_bytes: bytes, fmt: str = "json", style: str = "") -> dict:
+def transcribe_via_runpod(audio_bytes: bytes, fmt: str = "json",
+                          style: str = "", want_words: bool = False) -> dict:
     """Отправляет аудио в Runpod и возвращает output задания.
 
     Возвращаемый dict — то, что отдал runpod_handler: для fmt="json" это
     {"language", "duration", "segments": [...]}.
 
-    style — режим нарезки ("word" / "phrase"), выбранный пользователем в панели.
-    Пустая строка означает «как настроено у воркера»: нарезка живёт там, потому
-    что оттуда приходят уже готовые сегменты.
+    want_words=True просит СЫРЫЕ сегменты со словами: нарезку и оформление
+    делает шлюз, поэтому их правки катятся одним `fly deploy`. Старый воркер
+    этот флаг не знает и вернёт уже нарезанные сегменты — шлюз это распознаёт
+    по отсутствию признака `raw` и работает по-старому.
+
+    style — режим нарезки ("word" / "phrase") для старого воркера, который режет
+    сам. При want_words он не нужен, но передаётся для совместимости.
     """
     if not (settings.runpod_endpoint_id and settings.runpod_api_key):
         raise RunpodError("Runpod не сконфигурирован (KZSUB_RUNPOD_ENDPOINT_ID/API_KEY)")
@@ -84,6 +89,8 @@ def transcribe_via_runpod(audio_bytes: bytes, fmt: str = "json", style: str = ""
     }
     if style:
         payload["input"]["style"] = style
+    if want_words:
+        payload["input"]["want_words"] = True
 
     job = _request(base + "/run", payload)
     job_id = job.get("id")
