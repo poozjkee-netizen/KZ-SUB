@@ -84,9 +84,13 @@ def _runpod_transcribe(
     results.sort(key=lambda r: r[0])          # порядок кусков, а не порядок ответов
     segments = [seg for _, segs in results for seg in segs]
 
+    # Режим пишем в лог: если субтитры пришли не в том стиле, первый вопрос —
+    # дошёл ли выбор до воркера или там стоит старый образ.
     logger.info(
-        "Аудио %.0f c: конвертация %.1f c, кусков %d, распознавание %.1f c, сегментов %d",
-        total_duration, convert_seconds, len(chunks), time.monotonic() - t1, len(segments),
+        "Аудио %.0f c: конвертация %.1f c, кусков %d, распознавание %.1f c, "
+        "сегментов %d, режим %s",
+        total_duration, convert_seconds, len(chunks), time.monotonic() - t1,
+        len(segments), style or f"(по умолчанию: {settings.caption_style})",
     )
     return segments, total_duration, wav_bytes
 
@@ -126,7 +130,18 @@ async def _startup() -> None:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "model": settings.whisper_model, "language": settings.language}
+    """Живость и — важнее — что именно задеплоено.
+
+    Поле `styles` появилось вместе с выбором режима нарезки: по нему видно,
+    новый ли код на машине, без гаданий «а точно ли прошёл fly deploy».
+    """
+    return {
+        "status": "ok",
+        "model": settings.whisper_model,
+        "language": settings.language,
+        "styles": list(STYLES),
+        "default_style": settings.caption_style,
+    }
 
 
 @app.get("/license")
