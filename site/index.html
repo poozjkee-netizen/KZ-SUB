@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NP SUB — қазақша субтитры прямо в Premiere Pro</title>
+<meta name="description" content="Плагин для Adobe Premiere Pro: распознаёт казахскую речь и ставит субтитры на таймлайн. Premiere этого не умеет — NP SUB умеет. Демо 3 минуты бесплатно.">
+<meta property="og:title" content="NP SUB — қазақша субтитры прямо в Premiere Pro">
+<meta property="og:description" content="Premiere не понимает казахский. NP SUB понимает: одна кнопка — субтитры на таймлайне.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/*
+ * NP SUB — лендинг. Тёмная энергия, контролируемое движение, техничность.
+ * Палитра и типографика заданы владельцем продукта; всё остальное подчинено
+ * одной задаче — довести посетителя до кнопки «Взять демо» в Telegram.
+ * Один файл без сборки и без внешних скриптов: страницу можно положить
+ * куда угодно (GitHub Pages, Netlify, любой хостинг) простым копированием.
+ */
+:root {
+  --night: #0A0B0C;
+  --white: #F4F5F0;
+  --lime: #C7FF38;
+  --graphite: #303237;
+  --gray: #A4A6A9;
+
+  --line: rgba(244, 245, 240, 0.10);
+  --line-strong: rgba(244, 245, 240, 0.18);
+  --panel: rgba(244, 245, 240, 0.026);
+
+  --sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --gap: clamp(72px, 11vw, 148px);
+  --pad: clamp(20px, 5vw, 64px);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--night);
+  color: var(--white);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+img, svg { max-width: 100%; }
+a { color: inherit; }
+
+/* Тонкая техническая сетка на фоне: даёт «приборную» плоскость,
+   но держится ниже порога заметности, чтобы не спорить с текстом. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 100% 96px,
+    linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 96px 100%;
+  opacity: 0.28;
+  mask-image: radial-gradient(circle at 50% 22%, #000 0%, transparent 78%);
+  -webkit-mask-image: radial-gradient(circle at 50% 22%, #000 0%, transparent 78%);
+  z-index: 0;
+}
+
+.wrap {
+  position: relative;
+  z-index: 1;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 var(--pad);
+}
+
+/* --- Служебная типографика: моно для всего, что «показания прибора» --- */
+.mono {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gray);
+}
+.mono .tick { color: var(--lime); }
+
+h1, h2, h3 { font-weight: 800; letter-spacing: -0.025em; line-height: 1.06; margin: 0; }
+h1 { font-size: clamp(38px, 7.2vw, 78px); }
+h2 { font-size: clamp(28px, 4.4vw, 46px); }
+h3 { font-size: 19px; letter-spacing: -0.01em; line-height: 1.3; }
+p { margin: 0; }
+.lead { font-size: clamp(17px, 2vw, 21px); color: var(--gray); max-width: 56ch; }
+.lime { color: var(--lime); }
+
+/* --- Шапка --- */
+header {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px var(--pad);
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand-name {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  color: var(--white);
+}
+.brand svg { display: block; }
+.nav { display: flex; align-items: center; gap: 26px; }
+.nav a {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gray);
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+.nav a:hover { color: var(--white); }
+@media (max-width: 720px) { .nav a:not(.nav-cta) { display: none; } }
+
+/* --- Кнопки --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 26px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+.btn-primary { background: var(--lime); color: var(--night); font-weight: 500; }
+.btn-primary:hover { transform: translateY(-2px); background: #D5FF63; }
+.btn-ghost { border-color: var(--line-strong); color: var(--white); }
+.btn-ghost:hover { border-color: var(--lime); color: var(--lime); }
+.btn:focus-visible, a:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+}
+.nav-cta {
+  border: 1px solid var(--line-strong);
+  padding: 9px 16px;
+  border-radius: 2px;
+}
+.nav-cta:hover { border-color: var(--lime); color: var(--lime) !important; }
+
+/* --- Герой --- */
+.hero { padding: clamp(48px, 9vw, 104px) 0 var(--gap); }
+.hero h1 { margin: 22px 0 26px; max-width: 17ch; }
+.hero .lead { margin-bottom: 38px; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.hero-note {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--gray);
+  letter-spacing: 0.06em;
+}
+
+/* Линейка-шкала под геройским блоком — «прибор», а не украшение:
+   она отбивает верх страницы от показателей. */
+.ruler {
+  margin-top: clamp(48px, 7vw, 82px);
+  height: 26px;
+  border-top: 1px solid var(--line);
+  background-image: linear-gradient(90deg, var(--line-strong) 1px, transparent 1px);
+  background-size: 44px 100%;
+  background-position: 0 0;
+  background-repeat: repeat-x;
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+/* --- Показатели --- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  margin-top: 30px;
+}
+.stat { background: var(--night); padding: 26px 24px; }
+.stat b {
+  display: block;
+  font-family: var(--mono);
+  font-size: clamp(26px, 3.6vw, 36px);
+  font-weight: 500;
+  color: var(--lime);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+.stat span { font-size: 14px; color: var(--gray); }
+
+/* --- Секции --- */
+section { padding: var(--gap) 0; border-top: 1px solid var(--line); }
+.sec-head { margin-bottom: clamp(36px, 5vw, 58px); }
+.sec-head h2 { margin: 14px 0 18px; max-width: 20ch; }
+
+/* --- Проблема / решение --- */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+@media (max-width: 820px) { .split { grid-template-columns: 1fr; } }
+.split > div { background: var(--night); padding: clamp(26px, 4vw, 42px); }
+.split h3 { margin-bottom: 12px; }
+.split p { color: var(--gray); font-size: 16px; }
+.split .bad h3 { color: var(--gray); }
+.split .good h3 { color: var(--lime); }
+
+/* --- Шаги --- */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(24px, 3vw, 44px); }
+@media (max-width: 820px) { .steps { grid-template-columns: 1fr; } }
+.step { border-top: 1px solid var(--line-strong); padding-top: 22px; }
+.step-n {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  color: var(--lime);
+  display: block;
+  margin-bottom: 16px;
+}
+.step h3 { margin-bottom: 10px; }
+.step p { color: var(--gray); font-size: 15.5px; }
+
+/* --- Демо-вывод (реальный формат .srt) --- */
+.demo {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: clamp(20px, 3vw, 32px);
+  overflow-x: auto;
+}
+.demo-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 18px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.dot { width: 7px; height: 7px; background: var(--lime); border-radius: 50%; flex: none; }
+.demo pre {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: 2;
+  color: var(--white);
+  white-space: pre;
+}
+.demo .tc { color: var(--gray); }
+.demo .ru { color: var(--lime); }
+.demo-note { margin-top: 18px; font-size: 14px; color: var(--gray); }
+
+/* --- Возможности --- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.card { background: var(--night); padding: clamp(24px, 3vw, 34px); }
+.card svg { color: var(--lime); margin-bottom: 18px; display: block; }
+.card h3 { margin-bottom: 10px; }
+.card p { color: var(--gray); font-size: 15.5px; }
+
+/* --- Тарифы --- */
+.plans { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+@media (max-width: 820px) { .plans { grid-template-columns: 1fr; } }
+.plan { background: var(--night); padding: clamp(28px, 4vw, 44px); display: flex; flex-direction: column; }
+.plan.featured { background: var(--panel); }
+.plan-name { font-family: var(--mono); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gray); }
+.plan.featured .plan-name { color: var(--lime); }
+.price {
+  font-family: var(--mono);
+  font-size: clamp(34px, 5vw, 46px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 18px 0 6px;
+  line-height: 1;
+}
+.price-note { font-size: 14px; color: var(--gray); margin-bottom: 26px; }
+.plan ul { list-style: none; margin: 0 0 30px; padding: 0; display: grid; gap: 12px; }
+.plan li { display: flex; gap: 11px; align-items: flex-start; font-size: 15.5px; color: var(--gray); }
+.plan li svg { flex: none; margin-top: 5px; color: var(--lime); }
+.plan .btn { margin-top: auto; }
+
+/* --- FAQ --- */
+.faq { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+details { background: var(--night); }
+summary {
+  padding: 22px clamp(20px, 3vw, 30px);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 16.5px;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  transition: color 180ms ease;
+}
+summary:hover { color: var(--lime); }
+summary::-webkit-details-marker { display: none; }
+summary::after {
+  content: "+";
+  font-family: var(--mono);
+  color: var(--lime);
+  font-size: 20px;
+  line-height: 1;
+  flex: none;
+}
+details[open] summary::after { content: "−"; }
+details p {
+  padding: 0 clamp(20px, 3vw, 30px) 24px;
+  color: var(--gray);
+  font-size: 15.5px;
+  max-width: 74ch;
+}
+
+/* --- Финальный призыв --- */
+.final { text-align: center; padding: var(--gap) 0; border-top: 1px solid var(--line); }
+.final h2 { margin: 16px auto 20px; max-width: 18ch; }
+.final .lead { margin: 0 auto 34px; text-align: center; }
+
+/* --- Подвал --- */
+footer {
+  border-top: 1px solid var(--line);
+  padding: 34px var(--pad);
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  color: var(--gray);
+  text-transform: uppercase;
+}
+footer a { text-decoration: none; }
+footer a:hover { color: var(--lime); }
+
+/* --- Появление при скролле: движение подчёркивает порядок чтения --- */
+.rise { opacity: 0; transform: translateY(18px); transition: opacity 520ms ease, transform 520ms cubic-bezier(0.16, 1, 0.3, 1); }
+.rise.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .rise { opacity: 1; transform: none; transition: none; }
+  .btn:hover { transform: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="brand" href="#top" aria-label="NP SUB — на главную">
+    <!-- Небольшой знак: две «дорожки» субтитров на таймлайне. -->
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+      <rect x="0.5" y="0.5" width="21" height="21" stroke="#303237"/>
+      <rect x="4" y="8" width="14" height="2" fill="#C7FF38"/>
+      <rect x="4" y="12" width="8" height="2" fill="#A4A6A9"/>
+    </svg>
+    <span class="brand-name">NP SUB</span>
+  </a>
+  <nav class="nav">
+    <a href="#how">Как работает</a>
+    <a href="#features">Возможности</a>
+    <a href="#pricing">Тариф</a>
+    <a class="nav-cta" href="#pricing">Демо 3 мин</a>
+  </nav>
+</header>
+
+<main id="top">
+
+  <section class="hero" style="border-top: none;">
+    <div class="wrap">
+      <p class="mono rise"><span class="tick">◆</span> Adobe Premiere Pro · Қазақ тілі</p>
+      <h1 class="rise">Premiere не понимает казахский.<br><span class="lime">NP SUB</span> понимает.</h1>
+      <p class="lead rise">Плагин распознаёт казахскую речь и раскладывает субтитры прямо на таймлайн — с тайм-кодами, без экспорта, без сторонних сервисов и без ручного набора.</p>
+      <div class="hero-actions rise">
+        <a class="btn btn-primary" href="#pricing">Взять демо — 3 минуты</a>
+        <a class="btn btn-ghost" href="#how">Как это работает</a>
+      </div>
+      <p class="hero-note rise" style="margin-top:18px;">Windows и macOS · Установка в один клик · Оплата Kaspi</p>
+      <div class="ruler" aria-hidden="true"></div>
+      <div class="stats rise">
+        <div class="stat"><b>~2 мин</b><span>обработка 10-минутного ролика</span></div>
+        <div class="stat"><b>3 мин</b><span>бесплатно, без карты</span></div>
+        <div class="stat"><b>1 490 ₸</b><span>полный доступ</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="problem">
+    <div class="wrap">
+      <div class="sec-head rise">
+        <p class="mono"><span class="tick">01</span> Проблема</p>
+        <h2>Автоматические субтитры Premiere казахский не распознают.</h2>
+        <p class="lead">Поэтому казахоязычный монтажёр либо набирает реплики руками, либо гоняет ролик через чужие сервисы и потом вручную сводит тайм-коды.</p>
+      </div>
+      <div class="split rise">
+        <div class="bad">
+          <h3>Как сейчас</h3>
+          <p>Экспорт аудио → загрузка в сторонний сервис → скачивание файла → импорт → правка тайм-кодов. Час работы на десятиминутный ролик, и так каждый раз.</p>
+        </div>
+        <div class="good">
+          <h3>С NP SUB</h3>
+          <p>Открыть панель в Premiere, нажать одну кнопку. Через пару минут субтитры уже стоят на таймлайне — остаётся вычитать текст.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="wrap">
+      <div class="sec-head rise">
+        <p class="mono"><span class="tick">02</span> Как работает</p>
+        <h2>Три шага. Дальше — обычный монтаж.</h2>
+      </div>
+      <div class="steps">
+        <div class="step rise">
+          <span class="step-n">01</span>
+          <h3>Установить панель</h3>
+          <p>Установщик для Windows и macOS делает всё сам — в реестре и настройках ковыряться не нужно. Панель появляется в меню «Окно» Premiere Pro.</p>
+        </div>
+        <div class="step rise">
+          <span class="step-n">02</span>
+          <h3>Нажать кнопку</h3>
+          <p>Панель сама берёт звук из активной секвенции. Ничего экспортировать и никуда загружать вручную не надо.</p>
+        </div>
+        <div class="step rise">
+          <span class="step-n">03</span>
+          <h3>Получить субтитры</h3>
+          <p>Реплики приходят на таймлайн с готовыми тайм-кодами — в караоке-режиме по словам или обычными фразами.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="demo">
+    <div class="wrap">
+      <div class="sec-head rise">
+        <p class="mono"><span class="tick">03</span> Что получается</p>
+        <h2>Живая казахская речь — вместе с русскими вставками.</h2>
+        <p class="lead">Разговорный казахский почти всегда смешанный. NP SUB пишет русские слова по-русски, а не «оказашивает» их.</p>
+      </div>
+      <div class="demo rise">
+        <div class="demo-bar">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="mono" style="letter-spacing:0.1em;">sequence_01.srt</span>
+        </div>
+        <pre><span class="tc">00:00:01,240 → 00:00:03,010</span>  Бүгін, <span class="ru">кстати</span>, қызық болды
+<span class="tc">00:00:03,010 → 00:00:05,480</span>  Монтаж дайын, <span class="ru">и всё готово</span>
+<span class="tc">00:00:05,480 → 00:00:07,900</span>  <span class="ru">Короче</span>, жалғастырамыз</pre>
+        <p class="demo-note">Формат — обычный <span class="mono" style="font-size:13px; text-transform:none; letter-spacing:0;">.srt</span>, поэтому субтитры остаются вашими: их можно править, стилизовать и переносить куда угодно.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head rise">
+        <p class="mono"><span class="tick">04</span> Возможности</p>
+        <h2>Сделано под казахский, а не переведено на него.</h2>
+      </div>
+      <div class="grid">
+        <div class="card rise">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12h3l2-5 3 10 3-8 2 3h5"/></svg>
+          <h3>Казахская речь</h3>
+          <p>Модель работает именно с казахским: специфические звуки, окончания и разговорный темп — не побочный режим общей мультиязычной системы.</p>
+        </div>
+        <div class="card rise">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h13"/><rect x="17" y="9" width="4" height="6"/></svg>
+          <h3>Караоке или фразы</h3>
+          <p>Пословный режим для динамичных вертикальных роликов и обычные реплики-фразы для интервью и влогов — переключается в панели.</p>
+        </div>
+        <div class="card rise">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>
+          <h3>Точные тайм-коды</h3>
+          <p>Реплики привязаны к речи, а не расставлены равномерно. Меньше правок вручную после того, как субтитры уже на таймлайне.</p>
+        </div>
+        <div class="card rise">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 4h14v16l-7-4-7 4z"/></svg>
+          <h3>Словарь правок</h3>
+          <p>Частые ошибки в русских вставках и именах чинятся на сервере — исправления приезжают ко всем сразу, переустанавливать плагин не нужно.</p>
+        </div>
+        <div class="card rise">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3v13"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>
+          <h3>Ролики до 10 минут</h3>
+          <p>Длинное аудио режется и обрабатывается параллельно, поэтому десятиминутный ролик занимает пару минут, а не пару часов.</p>
+        </div>
+        <div class="card rise">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="4" y="10" width="16" height="10"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+          <h3>Видео остаётся у вас</h3>
+          <p>На сервер уходит только звуковая дорожка для распознавания. Само видео никуда не загружается и не хранится.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing">
+    <div class="wrap">
+      <div class="sec-head rise">
+        <p class="mono"><span class="tick">05</span> Тариф</p>
+        <h2>Один платный тариф. Без подписочных лабиринтов.</h2>
+        <p class="lead">Сначала попробуйте на своём ролике — демо выдаётся сразу и не требует карты.</p>
+      </div>
+      <div class="plans rise">
+        <div class="plan">
+          <span class="plan-name">Demo</span>
+          <p class="price">0 ₸</p>
+          <p class="price-note">3 минуты аудио, без срока действия</p>
+          <ul>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>Полное качество распознавания</li>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>Выдаётся мгновенно в Telegram</li>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>Без карты и без автосписаний</li>
+          </ul>
+          <a class="btn btn-ghost" href="#" data-bot>Получить демо-ключ</a>
+        </div>
+        <div class="plan featured">
+          <span class="plan-name">Standard</span>
+          <p class="price">1 490 ₸</p>
+          <p class="price-note">60 минут аудио или 30 дней — что закончится раньше</p>
+          <ul>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>60 минут распознавания</li>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>Работает на двух устройствах по одному ключу</li>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>Оплата Kaspi, ключ приходит в Telegram</li>
+            <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg>Остаток минут виден прямо в панели</li>
+          </ul>
+          <a class="btn btn-primary" href="#" data-bot>Купить доступ</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <div class="sec-head rise">
+        <p class="mono"><span class="tick">06</span> Вопросы</p>
+        <h2>Коротко о главном.</h2>
+      </div>
+      <div class="faq rise">
+        <details>
+          <summary>Какие версии Premiere Pro поддерживаются?</summary>
+          <p>Панель ставится во все версии Premiere Pro, где есть расширения CEP — это Premiere Pro 2020 (версия 14.0) и новее, на Windows и macOS. Установщик сам находит установленные версии и настраивает их.</p>
+        </details>
+        <details>
+          <summary>Куда уходит моё видео?</summary>
+          <p>Никуда. Панель извлекает только звуковую дорожку и отправляет на распознавание её. Видеофайл остаётся на вашем компьютере.</p>
+        </details>
+        <details>
+          <summary>Насколько точно распознавание?</summary>
+          <p>Достаточно точно, чтобы не набирать субтитры с нуля: вы получаете готовую раскладку по тайм-кодам и вычитываете текст. Полностью безошибочного распознавания казахской разговорной речи сегодня не даёт никто — мы честно говорим, что вычитка нужна.</p>
+        </details>
+        <details>
+          <summary>Что будет, когда закончатся минуты?</summary>
+          <p>Бот заранее предупредит, что остаток подходит к концу, и пришлёт ссылку на продление. Остаток минут всегда виден в самой панели.</p>
+        </details>
+        <details>
+          <summary>Как оплатить?</summary>
+          <p>Переводом Kaspi. После подтверждения оплаты бот сам выдаёт ключ в том же чате — ждать ответа менеджера отдельно не нужно.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <p class="mono rise"><span class="tick">◆</span> Тегін көріңіз</p>
+      <h2 class="rise">Проверьте на своём ролике за три минуты.</h2>
+      <p class="lead rise">Демо-ключ выдаётся сразу и ничего не стоит. Если субтитры вам не подойдут — вы просто ничего не заплатите.</p>
+      <p class="rise"><a class="btn btn-primary" href="#" data-bot>Взять демо в Telegram</a></p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <span>NP SUB · Қазақша субтитрлер</span>
+  <span><a href="#" data-bot>Telegram</a> · <a href="mailto:poozjkee@gmail.com">Почта</a></span>
+</footer>
+
+<script>
+/*
+ * Ссылка на бота задаётся в одном месте: подставьте адрес своего бота вместо
+ * BOT_URL, и все кнопки на странице обновятся разом.
+ */
+var BOT_URL = "https://t.me/";
+
+document.querySelectorAll('[data-bot]').forEach(function (a) {
+  a.setAttribute('href', BOT_URL);
+  a.setAttribute('target', '_blank');
+  a.setAttribute('rel', 'noopener');
+});
+
+/* Появление блоков при скролле. Без библиотеки: одна задача — один наблюдатель. */
+if ('IntersectionObserver' in window &&
+    !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e, i) {
+      if (!e.isIntersecting) return;
+      var el = e.target;
+      setTimeout(function () { el.classList.add('in'); }, Math.min(i, 4) * 60);
+      io.unobserve(el);
+    });
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+  document.querySelectorAll('.rise').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('.rise').forEach(function (el) { el.classList.add('in'); });
+}
+</script>
+
+</body>
+</html>
