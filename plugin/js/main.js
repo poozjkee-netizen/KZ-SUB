@@ -53,6 +53,7 @@
     poweredBy: document.getElementById("poweredBy"),
     langWrap: document.querySelector(".lang-wrap"),
     uiLangSelect: document.getElementById("uiLangSelect"),
+    styleBtns: document.querySelectorAll(".seg-btn"),
     // Прогресс
     progress: document.getElementById("progress"),
     progressStage: document.getElementById("progressStage"),
@@ -237,6 +238,32 @@
     // Вложенный пресет — источник истины; выбор вручную живёт только до перезапуска.
     localStorage.removeItem("kzsub.presetPath");
   } catch (e) {}
+
+  // --- Стиль субтитров ----------------------------------------------------
+  // Караоке (по слову) или фразы. Выбор уходит на сервер параметром запроса:
+  // нарезка делается там, поэтому переключение работает без обновления панели
+  // у пользователя. Значение по умолчанию — караоке, как было раньше.
+  var captionStyle = "word";
+  try {
+    var savedStyle = localStorage.getItem("kzsub.captionStyle") || "";
+    if (savedStyle === "word" || savedStyle === "phrase") { captionStyle = savedStyle; }
+  } catch (e) {}
+
+  function applyStyleButtons() {
+    for (var i = 0; i < els.styleBtns.length; i++) {
+      var b = els.styleBtns[i];
+      var on = b.getAttribute("data-style") === captionStyle;
+      b.setAttribute("aria-checked", on ? "true" : "false");
+      b.className = on ? "seg-btn is-active" : "seg-btn";
+    }
+  }
+
+  function setCaptionStyle(value) {
+    if (value !== "word" && value !== "phrase") { return; }
+    captionStyle = value;
+    try { localStorage.setItem("kzsub.captionStyle", value); } catch (e) {}
+    applyStyleButtons();
+  }
 
   function saveSettings() {
     try {
@@ -472,7 +499,7 @@
 
   function uploadForSrt(apiUrl, apiKey, filePath, onSent) {
     return new Promise(function (resolve, reject) {
-      var u = parseUrl(apiUrl, "/transcribe");
+      var u = parseUrl(apiUrl, "/transcribe?style=" + captionStyle);
       var boundary = "----kzsub" + Date.now().toString(16);
       var fileName = path.basename(filePath);
       var fileData = fs.readFileSync(filePath);
@@ -722,6 +749,12 @@
   els.settingsToggle.addEventListener("click", toggleSettings);
   els.apiKey.addEventListener("change", saveSettings); // ключ сохраняется сразу
   els.uiLangSelect.addEventListener("change", onUiLangChange);
+  for (var si = 0; si < els.styleBtns.length; si++) {
+    els.styleBtns[si].addEventListener("click", function () {
+      setCaptionStyle(this.getAttribute("data-style"));
+    });
+  }
+  applyStyleButtons();
   els.activationBtn.addEventListener("click", activate);
   els.activationKey.addEventListener("keydown", function (e) {
     if (e.keyCode === 13) { activate(); } // Enter — активировать

@@ -7,6 +7,7 @@
     audio_base64: аудиофайл в base64 (wav/mp3/m4a)
     api_key:      ключ KZ-SUB (проверяется как в основном API)
     fmt:          "srt" (по умолчанию) или "json"
+    style:        "word" (караоке) / "phrase" (фразы); нет — как в настройках
 
 Выход: {"srt": "..."} или {"segments": [...], "duration": ...}
        либо {"error": "..."} при ошибке.
@@ -60,9 +61,13 @@ def handler(job: dict) -> dict:
 
         raw_segments, duration = transcribe_file(tmp_path)
 
+        # Режим нарезки выбирает пользователь в панели; шлюз передаёт его сюда.
+        # Своё значение из настроек оставляем запасным — на случай старой панели.
+        style = (inp.get("style") or settings.caption_style or "").strip()
+
         segments = build_captions(
             raw_segments,
-            settings.caption_style,
+            style,
             glue_max_chars=settings.glue_max_chars,
             max_line_chars=settings.max_line_chars,
             max_lines=settings.max_lines,

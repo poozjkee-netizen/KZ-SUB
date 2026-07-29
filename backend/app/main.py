@@ -25,7 +25,7 @@ from .devices import DeviceLimitError, check_device
 from .licenses import LicenseError
 from .postprocess import postprocess
 from .runpod_client import AudioTooLarge, RunpodError, transcribe_via_runpod
-from .segmentation import build_captions
+from .segmentation import STYLES, build_captions
 from .srt import Segment, segments_to_srt
 from .style import apply_style
 from .timing import snap_starts_to_speech
@@ -40,7 +40,7 @@ os.makedirs(settings.tmp_dir, exist_ok=True)
 
 
 def _runpod_transcribe(
-    tmp_path: str, total_duration: float,
+    tmp_path: str, total_duration: float, style: str = "",
 ) -> tuple[list[Segment], float, bytes]:
     """Прокси-режим: конвертирует, при нужде режет на куски и склеивает сегменты.
 
@@ -64,7 +64,7 @@ def _runpod_transcribe(
     def run_chunk(item: tuple[int, tuple[bytes, float]]) -> tuple[int, list[Segment]]:
         idx, (chunk_bytes, offset) = item
         started = time.monotonic()
-        out = transcribe_via_runpod(chunk_bytes, "json")
+        out = transcribe_via_runpod(chunk_bytes, "json", style)
         segs = [
             Segment(float(s["start"]) + offset, float(s["end"]) + offset, str(s["text"]))
             for s in (out.get("segments") or [])
@@ -170,6 +170,7 @@ async def transcribe(
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
     x_device_id: str | None = Header(default=None, alias="X-Device-Id"),
     fmt: str = Query(default="srt", description="Формат ответа: 'srt' или 'json'"),
+    style: str = Query(default="", description="Нарезка: 'word' (караоке) или 'phrase'"),
 ):
     """Транскрибация плюс учёт прогона (events.py).
 
@@ -182,7 +183,7 @@ async def transcribe(
     stat: dict = {"license": "", "mode": "", "audio": 0.0, "segments": 0}
     status, reason = "ok", ""
     try:
-        return await _transcribe(file, x_api_key, x_device_id, fmt, stat)
+        return await _transcribe(file, x_api_key, x_device_id, fmt, style, stat)
     except HTTPException as e:
         status, reason = "error", f"http_{e.status_code}"
         raise
@@ -207,8 +208,16 @@ async def _transcribe(
     x_api_key: str | None,
     x_device_id: str | None,
     fmt: str,
+    style: str,
     stat: dict,
 ):
+    # Режим нарезки выбирает пользователь в панели. Неизвестное значение —
+    # ошибка запроса, а не повод молча выдать не то, что просили.
+    style = (style or "").strip()
+    if style and style not in STYLES:
+        raise HTTPException(status_code=400,
+                            detail=f"Неизвестный режим нарезки: {style}")
+
     if not x_api_key:
         raise HTTPException(status_code=401, detail="Требуется заголовок X-API-Key")
 
@@ -264,7 +273,7 @@ async def _transcribe(
             # (см. audio_convert / audio_chunk).
             try:
                 segments, duration, wav_bytes = await run_in_threadpool(
-                    _runpod_transcribe, tmp_path, estimated_seconds
+                    _runpod_transcribe, tmp_path, estimated_seconds, style
                 )
             except AudioTooLarge as e:
                 logger.warning("Аудио слишком большое: %s", e)
@@ -284,7 +293,7 @@ async def _transcribe(
             # Нарезаем субтитры в выбранном стиле (караоке по словам / фразы).
             segments = build_captions(
                 raw_segments,
-                settings.caption_style,
+                style or settings.caption_style,
                 glue_max_chars=settings.glue_max_chars,
                 max_line_chars=settings.max_line_chars,
                 max_lines=settings.max_lines,

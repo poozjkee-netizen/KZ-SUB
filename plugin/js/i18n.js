@@ -31,6 +31,10 @@ var I18N = (function () {
 
       // Настройки
       "settings.uiLangLabel": "Язык интерфейса",
+      "settings.styleLabel": "Стиль субтитров",
+      "settings.styleWord": "Караоке",
+      "settings.stylePhrase": "Фразы",
+      "settings.styleHint": "По одному слову или целыми фразами",
       "settings.keyLabel": "Ключ активации",
       "settings.keyPlaceholder": "Введите ключ",
       "settings.testBtn": "Проверить",
@@ -125,6 +129,10 @@ var I18N = (function () {
       "lang.soon": "Жақын арада · Қырғызша, Өзбекше",
 
       "settings.uiLangLabel": "Интерфейс тілі",
+      "settings.styleLabel": "Субтитр стилі",
+      "settings.styleWord": "Караоке",
+      "settings.stylePhrase": "Сөйлем",
+      "settings.styleHint": "Сөзбе-сөз немесе тұтас сөйлеммен",
       "settings.keyLabel": "Активация кілті",
       "settings.keyPlaceholder": "Кілтіңізді енгізіңіз",
       "settings.testBtn": "Тексеру",

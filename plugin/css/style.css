@@ -1,53 +1,49 @@
 /*
- * KZ-SUB panel — Black / Neon Aurora.
- * Чёрная тема, неоновые градиент-блобы на фоне, светящийся спиннер,
- * минималистичный центр: одна CTA-кнопка. Настройки — за шестерёнкой.
+ * NP SUB panel — тёмная энергия, контролируемое движение, техничность.
+ * Night Black фон, Pulse Lime как единственный акцент (действие и живые
+ * цифры), Manrope на текстах и IBM Plex Mono на всём «приборном».
+ * Минималистичный центр: одна CTA-кнопка. Настройки — за шестерёнкой.
  */
-/* Poppins — бесплатный фолбэк, визуально близкий к Cera Pro (геометрический гротеск). */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-
 /*
- * Cera Pro — коммерческий шрифт (TypeMates): подключаем ЛОКАЛЬНО установленный,
- * файл в плагин не вшиваем (лицензия). Нет в системе — используется Poppins.
+ * Manrope — заголовки и основной текст, IBM Plex Mono — тайм-коды, цифры и
+ * технические подписи. Подключаются так же, как раньше подключался Poppins;
+ * если шрифт не загрузился, стек падает на системный гротеск и системный
+ * моноширинный — панель остаётся читаемой.
  */
-@font-face {
-  font-family: 'Cera Pro';
-  src: local('Cera Pro'), local('CeraPro'), local('Cera Pro Regular'), local('CeraPro-Regular');
-  font-weight: 400;
-}
-@font-face {
-  font-family: 'Cera Pro';
-  src: local('Cera Pro Medium'), local('CeraPro-Medium');
-  font-weight: 500;
-}
-@font-face {
-  font-family: 'Cera Pro';
-  src: local('Cera Pro Bold'), local('CeraPro-Bold');
-  font-weight: 600 700;
-}
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg: #0A0A0C;
-  --surface: rgba(255, 255, 255, 0.045);
-  --surface-2: rgba(255, 255, 255, 0.07);
-  --border: rgba(255, 255, 255, 0.09);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  /* Фирменная палитра: тёмная энергия, техничность без киберпанка.
+     Лайм — единственный акцент, он маркирует действие и живые цифры. */
+  --bg: #0A0B0C;                              /* Night Black  */
+  --surface: rgba(244, 245, 240, 0.04);
+  --surface-2: rgba(244, 245, 240, 0.07);
+  --border: rgba(244, 245, 240, 0.10);
+  --border-strong: rgba(244, 245, 240, 0.18);
 
-  --text: #F5F6F8;
-  --muted: #9BA1AC;
-  --faint: #62676F;
+  --text: #F4F5F0;                            /* Signal White */
+  --muted: #A4A6A9;                           /* Soft Gray    */
+  --graphite: #303237;                        /* Graphite: линии и плашки */
+  /* Тусклый текст — это всё ещё Soft Gray: Graphite на Night Black
+     не читается (контраст ~1.6:1), им красим линии, а не буквы. */
+  --faint: #7E8184;
 
-  --accent: #3B82F6;
-  --indigo: #6366F1;
-  --grad: linear-gradient(135deg, #3B82F6 0%, #6366F1 100%);
+  --accent: #C7FF38;                          /* Pulse Lime   */
+  --accent-soft: #D5FF63;
+  --on-accent: #0A0B0C;                       /* текст на лайме — только чёрный */
+  --grad: linear-gradient(135deg, #C7FF38 0%, #A8E020 100%);
 
-  --ok: #34D399;
+  --ok: #C7FF38;
   --error: #F87171;
 
   --radius: 16px;
   --radius-sm: 10px;
-  --ring: 0 0 0 3px rgba(59, 130, 246, 0.35);
+  --ring: 0 0 0 3px rgba(199, 255, 56, 0.32);
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
+
+  --sans: 'Manrope', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  /* Моно — тайм-коды, остаток минут, проценты: цифры не должны прыгать. */
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -55,7 +51,7 @@ html, body { height: 100%; }
 
 body {
   margin: 0;
-  font-family: 'Cera Pro', 'Poppins', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  font-family: var(--sans);
   font-size: 13px;
   line-height: 1.5;
   color: var(--text);
@@ -82,19 +78,19 @@ body {
 .blob-1 {
   width: 340px; height: 340px;
   left: -120px; top: -100px;
-  background: radial-gradient(circle at 35% 35%, #2563EB, transparent 65%);
+  background: radial-gradient(circle at 35% 35%, #C7FF38, transparent 65%);
   animation: drift-1 10s ease-in-out infinite alternate;
 }
 .blob-2 {
   width: 300px; height: 300px;
   right: -110px; top: 30%;
-  background: radial-gradient(circle at 60% 40%, #7C3AED, transparent 65%);
+  background: radial-gradient(circle at 60% 40%, #303237, transparent 65%);
   animation: drift-2 13s ease-in-out infinite alternate;
 }
 .blob-3 {
   width: 320px; height: 320px;
   left: 20%; bottom: -140px;
-  background: radial-gradient(circle at 50% 50%, #0EA5E9, transparent 65%);
+  background: radial-gradient(circle at 50% 50%, #A8E020, transparent 65%);
   animation: drift-3 11s ease-in-out infinite alternate;
 }
 @keyframes drift-1 { to { transform: translate(60px, 40px) scale(1.15); } }
@@ -145,7 +141,7 @@ body {
   border: none;
   background: transparent;
   font-weight: 600;
-  color: #fff;
+  color: var(--text);
   cursor: pointer;
 }
 .lang-select:focus { box-shadow: none; border: none; }
@@ -228,6 +224,35 @@ input::placeholder { color: var(--faint); }
 input:focus { border-color: var(--accent); box-shadow: var(--ring); }
 input[readonly] { color: var(--muted); cursor: default; }
 
+/* Переключатель стиля субтитров: караоке / фразы.
+   Сегментированный, а не выпадающий список — вариантов два, и оба должны
+   быть видны сразу: это творческий выбор, а не техническая настройка. */
+.seg {
+  display: flex;
+  height: 34px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.seg-btn {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--border); }
+.seg-btn:hover { color: var(--text); }
+.seg-btn.is-active { background: var(--accent); color: var(--on-accent); font-weight: 500; }
+.seg-btn:focus-visible { outline: none; box-shadow: var(--ring); }
+
 .btn-ghost {
   height: 34px; padding: 0 12px;
   font-size: 12px; font-weight: 600;
@@ -262,20 +287,20 @@ input[readonly] { color: var(--muted); cursor: default; }
   width: 100%;
   max-width: 300px;
   height: 52px;
-  font-size: 14px; font-weight: 700;
-  letter-spacing: 0.04em;
-  font-family: inherit;
-  color: #fff;
+  font-size: 13px; font-weight: 500;
+  letter-spacing: 0.09em;
+  font-family: var(--mono);
+  color: var(--on-accent);
   background: var(--grad);
   border: none;
   border-radius: var(--radius);
   cursor: pointer;
-  box-shadow: 0 0 24px rgba(79, 106, 245, 0.45), var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 24px rgba(199, 255, 56, 0.28), var(--shadow-md);
   transition: transform 140ms ease, box-shadow 220ms ease, filter 220ms ease, opacity 200ms ease;
 }
 .btn-primary:hover {
   filter: brightness(1.07);
-  box-shadow: 0 0 34px rgba(79, 106, 245, 0.65), var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 34px rgba(199, 255, 56, 0.42), var(--shadow-md);
   transform: translateY(-1px);
 }
 .btn-primary:active { transform: translateY(0) scale(0.98); }
@@ -295,17 +320,17 @@ input[readonly] { color: var(--muted); cursor: default; }
 .spinner {
   width: 58px; height: 58px;
   border-radius: 50%;
-  background: conic-gradient(from 0deg, transparent 0deg, transparent 70deg, #3B82F6 220deg, #8B5CF6 330deg, #E0E7FF 360deg);
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 70deg, #303237 200deg, #A8E020 320deg, #C7FF38 360deg);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
           mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
   animation: spin 0.9s linear infinite;
-  filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.85));
+  filter: drop-shadow(0 0 10px rgba(199, 255, 56, 0.6));
 }
 .spinner-glow {
   position: absolute;
   inset: -22px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.28), transparent 60%);
+  background: radial-gradient(circle, rgba(199, 255, 56, 0.18), transparent 60%);
   animation: pulse 1.8s ease-in-out infinite;
   pointer-events: none;
 }
@@ -340,9 +365,10 @@ input[readonly] { color: var(--muted); cursor: default; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--mono);
+  color: var(--text);
   white-space: nowrap;
   transition: border-color 160ms ease;
 }
@@ -380,14 +406,15 @@ input[readonly] { color: var(--muted); cursor: default; }
   width: 0%;
   border-radius: 999px;
   background: var(--grad);
-  box-shadow: 0 0 12px rgba(99, 102, 241, 0.7);
+  box-shadow: 0 0 12px rgba(199, 255, 56, 0.55);
   transition: width 160ms linear;
 }
 .progress-pct {
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.02em;
-  color: #fff;
+  font-family: var(--mono);
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 
@@ -412,7 +439,7 @@ input[readonly] { color: var(--muted); cursor: default; }
   font-style: italic;
   letter-spacing: 0.02em;
   color: var(--muted);
-  text-shadow: 0 0 18px rgba(99, 102, 241, 0.35);
+  text-shadow: 0 0 18px rgba(199, 255, 56, 0.22);
   pointer-events: none;
 }
 .quote.hidden { display: none; }
@@ -437,7 +464,7 @@ input[readonly] { color: var(--muted); cursor: default; }
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(10, 10, 12, 0.92);
+  background: rgba(10, 11, 12, 0.94);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
@@ -452,11 +479,12 @@ input[readonly] { color: var(--muted); cursor: default; }
   gap: 10px;
 }
 .activation-brand {
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: #fff;
-  text-shadow: 0 0 26px rgba(99, 102, 241, 0.6);
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  font-family: var(--mono);
+  color: var(--text);
+  text-shadow: 0 0 26px rgba(199, 255, 56, 0.35);
   margin-bottom: 4px;
 }
 .activation-title { font-size: 15px; font-weight: 600; color: var(--text); }
