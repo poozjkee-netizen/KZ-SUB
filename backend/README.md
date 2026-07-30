@@ -52,7 +52,7 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
      "http://localhost:8000/transcribe?fmt=json"
 ```
 
-Коды ответа: `400` неизвестный режим нарезки · `401` нет/неизвестный ключ · `402` истёк срок или лимит минут · `403` заблокирован/лимит устройств · `413` файл слишком длинный · `500` ошибка транскрибации.
+Коды ответа: `400` неизвестный режим нарезки · `401` нет/неизвестный ключ · `402` истёк срок или лимит минут · `403` заблокирован/лимит устройств · `409` для этого ключа уже идёт обработка · `411` нет `Content-Length` · `413` файл слишком длинный или тяжёлый · `500` ошибка транскрибации · `503` сервис занят (см. `Retry-After`).
 Ответ несёт заголовок `X-Minutes-Remaining` (остаток минут или `unlimited`).
 
 ## Конфигурация (env, префикс `KZSUB_`)
@@ -83,6 +83,9 @@ curl -F "file=@sample_kz.wav" -H "X-API-Key: dev-key" \
 | `KZSUB_MAX_AUDIO_SECONDS`     | `600`        | лимит длительности файла (сек) = 10 мин (длинные режутся на куски) |
 | `KZSUB_CHUNK_SECONDS`         | `180`        | длина куска при нарезке длинного аудио (сек); кусок должен влезать в 10 MiB Runpod |
 | `KZSUB_CHUNK_CONCURRENCY`     | `3`          | сколько кусков гнать в Runpod параллельно (ограничено Max Workers эндпоинта) |
+| `KZSUB_MAX_UPLOAD_MB`         | `150`        | потолок размера тела `/transcribe`; проверяется ДО разбора формы |
+| `KZSUB_MAX_CONCURRENT_JOBS`   | `2`          | сколько роликов обрабатывать одновременно (защита памяти шлюза) |
+| `KZSUB_JOB_WAIT_SECONDS`      | `120`        | сколько ждать слот в очереди, потом `503` с `Retry-After` |
 | `KZSUB_CAPTION_STYLE`         | `word`       | режим нарезки по умолчанию: `word` (караоке) / `phrase` (фразы). Панель присылает свой выбор в параметре `style` |
 | `KZSUB_GLUE_MAX_CHARS`        | `2`          | в режиме `word`: короткие слова липнут к следующему |
 | `KZSUB_UPPERCASE`             | `false`      | ВЕРХНИЙ регистр субтитров            |
@@ -130,6 +133,7 @@ python tests/test_events.py
 python tests/test_dataset.py
 python tests/test_notify.py
 python tests/test_bot_users.py
+python tests/test_limits.py
 
 # Интеграционный тест HTTP-контракта /transcribe (нужен fastapi/httpx,
 # модель Whisper замокана — GPU/веса не требуются):
@@ -184,6 +188,21 @@ python -m app.telegram_bot set-webhook https://kzsub-gateway.fly.dev/telegram/we
 ```
 `python -m app.telegram_bot webhook-info` — проверить регистрацию;
 `delete-webhook` — снять (например, для локальной отладки long-polling).
+
+## Ограничители запросов (app/limits.py)
+`/transcribe` защищён **до** разбора тела: FastAPI разбирает multipart раньше,
+чем выполняется первая строка обработчика, поэтому проверка ключа внутри
+обработчика была бы уже поздней — тело успевало лечь на диск. Middleware в
+`main.py` отсекает запросы без `X-API-Key` (`401`), без `Content-Length`
+(`411`) и больше `KZSUB_MAX_UPLOAD_MB` (`413`).
+
+Одновременность ограничена `KZSUB_MAX_CONCURRENT_JOBS` — каждый прогон держит в
+памяти исходник, WAV и base64-куски, и на 1 ГБ несколько больших роликов дают
+OOM. Лишние запросы ждут слот до `KZSUB_JOB_WAIT_SECONDS`, потом получают `503`
+с `Retry-After`. Второй запрос с тем же ключом отклоняется сразу (`409`).
+
+Подробности и модель нагрузки — [`docs/CAPACITY.md`](../docs/CAPACITY.md),
+разбор угроз — [`docs/SECURITY.md`](../docs/SECURITY.md).
 
 ## Метрики прода (app/events.py)
 Каждый прогон `/transcribe` пишется строкой в SQLite на том же томе, что и

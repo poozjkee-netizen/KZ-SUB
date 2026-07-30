@@ -16,6 +16,8 @@
 | Узнать, почему принято то или иное решение | [`DECISIONS.md`](DECISIONS.md) |
 | Запустить проект локально впервые / отладить в Premiere | [`RUNBOOK.md`](RUNBOOK.md) |
 | Задеплоить бэкенд (Fly + Runpod), настроить том/анти-шаринг | [`HOSTING.md`](HOSTING.md) |
+| Понять, что защищено и что надо настроить руками | [`SECURITY.md`](SECURITY.md) |
+| Узнать, сколько выдержит сервер и что крутить при росте | [`CAPACITY.md`](CAPACITY.md) |
 | Собрать/подписать `.zxp` и раздать клиентам, выдать ключи | [`DISTRIBUTION.md`](DISTRIBUTION.md) |
 | Выпустить релиз (панель / шлюз / воркер) | [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) |
 | Разобраться с тарифами и экономикой | [`MONETIZATION.md`](MONETIZATION.md) |
@@ -30,5 +32,5 @@
 
 ## Аудитории
 - **Разработчик / Claude Code:** `CLAUDE.md` → `ARCHITECTURE.md` → `DECISIONS.md`.
-- **Ты как оператор прода:** `HOSTING.md`, `RELEASE_PROCESS.md`, `DISTRIBUTION.md`.
+- **Ты как оператор прода:** `HOSTING.md`, `RELEASE_PROCESS.md`, `DISTRIBUTION.md`, `SECURITY.md`, `CAPACITY.md`.
 - **Первый локальный запуск:** `RUNBOOK.md`.

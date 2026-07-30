@@ -6,11 +6,14 @@
 """
 from __future__ import annotations
 
+import asyncio
+import hmac
 import logging
 import os
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -24,6 +27,7 @@ from .audio_probe import probe_duration_seconds
 from .config import settings
 from .devices import DeviceLimitError, check_device
 from .licenses import LicenseError
+from .limits import JobGate, upload_reject
 from .postprocess import postprocess
 from .runpod_client import AudioTooLarge, RunpodError, transcribe_via_runpod
 from .segmentation import STYLES, build_captions, strip_punctuation_for
@@ -38,6 +42,38 @@ logger = logging.getLogger("kzsub.api")
 app = FastAPI(title="KZ-SUB API", version="0.1.0")
 
 os.makedirs(settings.tmp_dir, exist_ok=True)
+
+MAX_UPLOAD_BYTES = settings.max_upload_mb * 1024 * 1024
+_gate = JobGate(settings.max_concurrent_jobs)
+
+
+@app.middleware("http")
+async def guard_requests(request: Request, call_next):
+    """Отсекает негодные запросы ДО разбора тела и добавляет базовые заголовки.
+
+    Порядок здесь принципиален: `File(...)` в обработчике — это зависимость
+    FastAPI, она читает multipart раньше первой строки `_transcribe`. Значит
+    проверка ключа и размера внутри обработчика уже поздно — тело успевает лечь
+    во временный файл. Поэтому и то, и другое проверяется тут.
+    """
+    verdict = upload_reject(
+        request.method, request.url.path,
+        request.headers.get("content-length"),
+        bool((request.headers.get("x-api-key") or "").strip()),
+        MAX_UPLOAD_BYTES,
+    )
+    if verdict is not None:
+        code, detail = verdict
+        logger.warning("Запрос отклонён до разбора тела: %s %s → %s (%s)",
+                       request.method, request.url.path, code, detail)
+        response = JSONResponse({"detail": detail}, status_code=code)
+    else:
+        response = await call_next(request)
+
+    # Ответы API не предназначены для показа в браузере и для встраивания.
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 def _runpod_transcribe(
@@ -229,12 +265,65 @@ async def telegram_webhook(request: Request) -> dict:
     """
     if not settings.telegram_bot_token:
         raise HTTPException(status_code=404)
+
+    # Без секрета вебхук — открытая дверь: содержимое Update целиком задаёт
+    # тот, кто его прислал, включая поле `from.id`. Подделав его под ID
+    # продавца, посторонний выдал бы себе платную лицензию через кнопку
+    # подтверждения. Поэтому без секрета бот НЕ работает вовсе.
+    if not settings.telegram_webhook_secret:
+        logger.error(
+            "KZSUB_TELEGRAM_WEBHOOK_SECRET не задан — вебхук отключён. "
+            "Задай секрет и перерегистрируй: fly secrets set "
+            "KZSUB_TELEGRAM_WEBHOOK_SECRET=… && python -m app.telegram_bot "
+            "set-webhook https://<шлюз>/telegram/webhook"
+        )
+        raise HTTPException(status_code=503, detail="Вебхук не настроен")
+
     secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-    if settings.telegram_webhook_secret and secret != settings.telegram_webhook_secret:
+    # compare_digest вместо != : сравнение секретов не должно зависеть по
+    # времени от того, сколько первых символов угадано.
+    if not hmac.compare_digest(secret, settings.telegram_webhook_secret):
         raise HTTPException(status_code=401)
     update = await request.json()
     await run_in_threadpool(telegram_bot.handle_update, update)
     return {"ok": True}
+
+
+@asynccontextmanager
+async def _slot(api_key: str):
+    """Занимает слот обработки, при занятости — ждёт, а не отказывает сразу.
+
+    Распознавание длится десятки секунд, поэтому ожидание в очереди для
+    пользователя выглядит как «чуть дольше», а мгновенный отказ — как поломка.
+    Ждём до job_wait_seconds, потом отвечаем 503 с Retry-After: это честнее,
+    чем держать соединение бесконечно.
+
+    Второй запрос с тем же ключом не встаёт в очередь, а отклоняется сразу:
+    панель шлёт по одному ролику, значит это либо повтор, либо попытка занять
+    сервер целиком — ждать тут нечего.
+    """
+    deadline = time.monotonic() + settings.job_wait_seconds
+    while True:
+        ok, why = _gate.try_acquire(api_key)
+        if ok:
+            break
+        if why == "duplicate":
+            raise HTTPException(
+                status_code=409,
+                detail="Для этого ключа уже выполняется обработка",
+            )
+        if time.monotonic() >= deadline:
+            logger.warning("Очередь переполнена: активных %d", _gate.active)
+            raise HTTPException(
+                status_code=503,
+                detail="Сервис занят, попробуйте через минуту",
+                headers={"Retry-After": "60"},
+            )
+        await asyncio.sleep(1.0)
+    try:
+        yield
+    finally:
+        _gate.release(api_key)
 
 
 @app.post("/transcribe")
@@ -256,7 +345,8 @@ async def transcribe(
     stat: dict = {"license": "", "mode": "", "audio": 0.0, "segments": 0}
     status, reason = "ok", ""
     try:
-        return await _transcribe(file, x_api_key, x_device_id, fmt, style, stat)
+        async with _slot(x_api_key or ""):
+            return await _transcribe(file, x_api_key, x_device_id, fmt, style, stat)
     except HTTPException as e:
         status, reason = "error", f"http_{e.status_code}"
         raise
