@@ -221,6 +221,58 @@ header {
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
 }
 
+/* --- Демонстрация в геройском блоке --- */
+.demo-video { margin: clamp(32px, 5vw, 56px) 0 0; padding: 0; }
+.frame {
+  position: relative;
+  border: 1px solid var(--line-strong);
+  background: #000;
+  overflow: hidden;
+}
+/* Угловые засечки: рамка читается как «экран прибора», а не как картинка. */
+.frame::before, .frame::after {
+  content: "";
+  position: absolute;
+  width: 14px; height: 14px;
+  border: 1px solid var(--lime);
+  pointer-events: none;
+  z-index: 2;
+}
+.frame::before { left: 8px; top: 8px; border-right: 0; border-bottom: 0; }
+.frame::after { right: 8px; bottom: 8px; border-left: 0; border-top: 0; }
+.demo-video video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.video-toggle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+/* Пауза — показываем, что это управляемое видео, а не гифка. */
+.video-toggle::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 58px; height: 58px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--lime);
+  border-radius: 50%;
+  background:
+    linear-gradient(var(--lime), var(--lime)) center / 4px 18px no-repeat,
+    rgba(10, 11, 12, 0.55);
+  box-shadow: 4px 0 0 -1px var(--lime) inset;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.frame.paused .video-toggle::after { opacity: 1; }
+.video-toggle:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+.demo-video figcaption { margin-top: 12px; letter-spacing: 0.1em; }
+
 /* --- Показатели --- */
 .stats {
   display: grid;
@@ -392,18 +444,41 @@ footer a:hover { color: var(--lime); }
   footer { padding-bottom: 104px; }   /* панель не должна накрывать подвал */
 }
 
+/* --- Пальцем, а не мышью ---
+   На сенсорном экране в цель ниже ~44 px попадают мимо. Правило вешаем на
+   pointer: coarse, а не на ширину: планшет бывает шире телефона, но палец у
+   него тот же. На десктопе компактные 34 px остаются — там курсор точный. */
+@media (pointer: coarse) {
+  .brand { min-height: 44px; }
+  .lang button { min-height: 44px; padding: 0 14px; }
+  .nav-cta { min-height: 44px; }
+  footer a { display: inline-flex; align-items: center; min-height: 44px; }
+}
+/* Ссылки навигации подрастают только там, где они вообще видны: на узком
+   экране они скрыты, и `display` в правиле для пальца их бы вернул —
+   навигация переставала влезать и появлялась горизонтальная прокрутка. */
+@media (pointer: coarse) and (min-width: 861px) {
+  .nav > a:not(.nav-cta) { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
 /* --- Появление при скролле: движение подчёркивает порядок чтения --- */
-.rise { opacity: 0; transform: translateY(18px); transition: opacity 520ms ease, transform 520ms cubic-bezier(0.16, 1, 0.3, 1); }
-.rise.in { opacity: 1; transform: none; }
+.js .rise { opacity: 0; transform: translateY(18px); transition: opacity 520ms ease, transform 520ms cubic-bezier(0.16, 1, 0.3, 1); }
+.js .rise.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .rise { opacity: 1; transform: none; transition: none; }
+  .js .rise { opacity: 1; transform: none; transition: none; }
   .btn:hover { transform: none; }
   .dock { transition: none; }
 }
 </style>
 </head>
 <body>
+
+<script>
+  /* Появление блоков — украшение, а не условие читаемости. Метку `js` ставим
+     до отрисовки: без JS страница видна целиком, с JS блоки проявляются. */
+  document.documentElement.className += ' js';
+</script>
 
 <header>
   <a class="brand" href="#top" aria-label="NP SUB">
@@ -439,6 +514,22 @@ footer a:hover { color: var(--lime); }
         <a class="btn btn-ghost" href="#how" data-i18n="hero_cta2">Как это работает</a>
       </div>
       <p class="hero-note rise" style="margin-top:16px;" data-i18n="hero_note">Windows и macOS · Установка в один клик · Оплата Kaspi</p>
+
+      <!-- Демонстрация: показать работу сильнее, чем описать её.
+           Файл лежит рядом со страницей; если его нет — блок просто скрывается
+           (см. скрипт внизу), и страница остаётся целой. -->
+      <figure class="demo-video rise" id="heroVideo" hidden>
+        <div class="frame">
+          <video id="heroVideoEl" playsinline muted loop preload="metadata"
+                 aria-label="NP SUB в Premiere Pro">
+            <source src="np-sub-animation.mp4" type="video/mp4">
+          </video>
+          <button type="button" class="video-toggle" id="videoToggle"
+                  aria-label="play/pause"></button>
+        </div>
+        <figcaption class="mono" data-i18n="video_caption">Панель в Premiere Pro: одна кнопка — субтитры на таймлайне</figcaption>
+      </figure>
+
       <div class="ruler" aria-hidden="true"></div>
       <div class="stats rise">
         <div class="stat"><b data-i18n="stat1_v">~2 мин</b><span data-i18n="stat1_l">обработка 10-минутного ролика</span></div>
@@ -663,6 +754,7 @@ var I18N = {
     hero_lead: "Плагин қазақ тіліндегі сөзді танып, субтитрлерді тікелей таймлайнға қояды — тайм-кодтарымен, экспортсыз, бөгде сервистерсіз және қолмен терусіз.",
     hero_cta: "Демо алу — 3 минут", hero_cta2: "Қалай жұмыс істейді",
     hero_note: "Windows және macOS · Бір рет басып орнату · Kaspi арқылы төлем",
+    video_caption: "Premiere Pro-дағы панель: бір батырма — таймлайндағы субтитрлер",
 
     stat1_v: "~2 мин", stat1_l: "10 минуттық роликті өңдеу",
     stat2_v: "3 мин", stat2_l: "тегін, картасыз",
@@ -749,6 +841,7 @@ var I18N = {
     hero_lead: "Плагин распознаёт казахскую речь и раскладывает субтитры прямо на таймлайн — с тайм-кодами, без экспорта, без сторонних сервисов и без ручного набора.",
     hero_cta: "Взять демо — 3 минуты", hero_cta2: "Как это работает",
     hero_note: "Windows и macOS · Установка в один клик · Оплата Kaspi",
+    video_caption: "Панель в Premiere Pro: одна кнопка — субтитры на таймлайне",
 
     stat1_v: "~2 мин", stat1_l: "обработка 10-минутного ролика",
     stat2_v: "3 мин", stat2_l: "бесплатно, без карты",
@@ -868,6 +961,47 @@ document.querySelectorAll('[data-bot]').forEach(function (a) {
   a.setAttribute('target', '_blank');
   a.setAttribute('rel', 'noopener');
 });
+
+/*
+ * Видео. Показываем блок только когда файл реально доступен: страница живёт в
+ * репозитории и может быть опубликована без него — тогда пустая рамка выглядела
+ * бы поломкой. Автозапуск без звука и по нажатию — пауза; за экраном ставим на
+ * паузу, чтобы не жечь батарею и трафик впустую.
+ */
+(function () {
+  var fig = document.getElementById('heroVideo');
+  var video = document.getElementById('heroVideoEl');
+  var toggle = document.getElementById('videoToggle');
+  if (!fig || !video) return;
+
+  var frame = fig.querySelector('.frame');
+  function markPaused() { frame.classList.toggle('paused', video.paused); }
+
+  video.addEventListener('loadeddata', function () {
+    fig.hidden = false;
+    video.play().catch(function () { markPaused(); });   // автозапуск могут блокировать
+  });
+  video.addEventListener('error', function () { fig.hidden = true; });
+  video.addEventListener('play', markPaused);
+  video.addEventListener('pause', markPaused);
+
+  toggle.addEventListener('click', function () {
+    if (video.paused) { video.play().catch(function () {}); } else { video.pause(); }
+  });
+
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (entries) {
+      if (entries[0].isIntersecting) {
+        if (video.dataset.userPaused !== '1') { video.play().catch(function () {}); }
+      } else {
+        video.pause();
+      }
+    }, { threshold: 0.25 }).observe(fig);
+  }
+  toggle.addEventListener('click', function () {
+    video.dataset.userPaused = video.paused ? '1' : '0';
+  });
+})();
 
 /* Нижняя панель на телефоне: показываем, когда первый экран уже позади. */
 (function () {

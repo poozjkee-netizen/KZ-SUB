@@ -1,0 +1,42 @@
+# Публикация лендинга (site/) на GitHub Pages.
+#
+# Почему через Actions, а не «Deploy from branch»: каталог `docs/` в этом
+# репозитории занят документацией проекта, а держать копию сайта во второй
+# ветке — верный способ однажды опубликовать устаревшую версию.
+#
+# Включить один раз: Settings → Pages → Source: GitHub Actions.
+name: pages
+
+on:
+  push:
+    paths: ["site/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Параллельные публикации не нужны: важна последняя версия, а не все подряд.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    # Публикуем только ветку по умолчанию, какой бы она ни была: имя ветки в
+    # этом проекте ещё может поменяться, а забытый хардкод молча перестанет
+    # публиковать сайт.
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
