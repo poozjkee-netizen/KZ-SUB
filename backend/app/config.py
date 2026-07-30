@@ -302,5 +302,16 @@ class Settings:
     # Номер/реквизит Kaspi для оплаты — показывается клиенту в /buy.
     kaspi_phone: str = _get("KASPI_PHONE", "")
 
+    # Путь к БД языковых предпочтений бота (app/bot_users.py). Пусто —
+    # STATE_DIR/bot_users.db, иначе TMP_DIR/bot_users.db. Отдельная БД, а не
+    # таблица в licenses.db: язык нужен ДО того, как у пользователя появится
+    # лицензия (сперва выбор языка, потом уже /demo или /buy).
+    bot_users_db: str = _get("BOT_USERS_DB", "")
+
+    # Ссылка на лендинг — бот показывает её в приветствии и в /buy: там же
+    # демонстрация работы и честный ответ про точность, это усиливает решение
+    # о покупке лучше, чем текст одной строкой в чате.
+    landing_url: str = _get("LANDING_URL", "https://poozjkee-netizen.github.io/KZ-SUB/")
+
 
 settings = Settings()

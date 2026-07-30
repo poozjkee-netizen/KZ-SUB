@@ -225,6 +225,10 @@ header {
 .demo-video { margin: clamp(32px, 5vw, 56px) 0 0; padding: 0; }
 .frame {
   position: relative;
+  /* Фикс. соотношение сторон — рамка не должна схлопываться до появления
+     метаданных видео: на iOS с мобильным интернетом preload часто
+     игнорируется, и без явной высоты блок был бы нулевой до самого play(). */
+  aspect-ratio: 16 / 9;
   border: 1px solid var(--line-strong);
   background: #000;
   overflow: hidden;
@@ -241,9 +245,11 @@ header {
 .frame::before { left: 8px; top: 8px; border-right: 0; border-bottom: 0; }
 .frame::after { right: 8px; bottom: 8px; border-left: 0; border-top: 0; }
 .demo-video video {
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;   /* реальные пропорции экрана могут не совпасть с 16:9 */
 }
 .video-toggle {
   position: absolute;
@@ -518,7 +524,7 @@ footer a:hover { color: var(--lime); }
       <!-- Демонстрация: показать работу сильнее, чем описать её.
            Файл лежит рядом со страницей; если его нет — блок просто скрывается
            (см. скрипт внизу), и страница остаётся целой. -->
-      <figure class="demo-video rise" id="heroVideo" hidden>
+      <figure class="demo-video rise" id="heroVideo">
         <div class="frame">
           <video id="heroVideoEl" playsinline muted loop preload="metadata"
                  aria-label="NP SUB в Premiere Pro">
@@ -963,10 +969,15 @@ document.querySelectorAll('[data-bot]').forEach(function (a) {
 });
 
 /*
- * Видео. Показываем блок только когда файл реально доступен: страница живёт в
- * репозитории и может быть опубликована без него — тогда пустая рамка выглядела
- * бы поломкой. Автозапуск без звука и по нажатию — пауза; за экраном ставим на
- * паузу, чтобы не жечь батарею и трафик впустую.
+ * Видео. Блок виден всегда (место под него зарезервировано в CSS через
+ * aspect-ratio) — раньше он открывался только по событию 'loadeddata', а на
+ * iOS с мобильным интернетом браузер часто игнорирует preload и это событие
+ * не приходит вовсе: блок оставался невидимым навсегда. Прячем только при
+ * настоящей ошибке (файла нет или он битый).
+ *
+ * Автозапуск без звука через IntersectionObserver: срабатывает и на
+ * первом экране при загрузке страницы, и при прокрутке к видео; за экраном —
+ * пауза, чтобы не жечь батарею и трафик впустую.
  */
 (function () {
   var fig = document.getElementById('heroVideo');
@@ -975,32 +986,29 @@ document.querySelectorAll('[data-bot]').forEach(function (a) {
   if (!fig || !video) return;
 
   var frame = fig.querySelector('.frame');
+  var userPaused = false;
   function markPaused() { frame.classList.toggle('paused', video.paused); }
 
-  video.addEventListener('loadeddata', function () {
-    fig.hidden = false;
-    video.play().catch(function () { markPaused(); });   // автозапуск могут блокировать
-  });
   video.addEventListener('error', function () { fig.hidden = true; });
   video.addEventListener('play', markPaused);
   video.addEventListener('pause', markPaused);
 
   toggle.addEventListener('click', function () {
+    userPaused = !video.paused;                 // фиксируем НАМЕРЕНИЕ до смены состояния
     if (video.paused) { video.play().catch(function () {}); } else { video.pause(); }
   });
 
   if ('IntersectionObserver' in window) {
     new IntersectionObserver(function (entries) {
       if (entries[0].isIntersecting) {
-        if (video.dataset.userPaused !== '1') { video.play().catch(function () {}); }
+        if (!userPaused) { video.play().catch(markPaused); }
       } else {
         video.pause();
       }
     }, { threshold: 0.25 }).observe(fig);
+  } else {
+    video.play().catch(markPaused);
   }
-  toggle.addEventListener('click', function () {
-    video.dataset.userPaused = video.paused ? '1' : '0';
-  });
 })();
 
 /* Нижняя панель на телефоне: показываем, когда первый экран уже позади. */

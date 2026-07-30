@@ -16,7 +16,7 @@ from fastapi import FastAPI, File, Header, HTTPException, Query, Request, Upload
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
-from . import dataset, events, licenses, notify, telegram_bot
+from . import bot_users, dataset, events, licenses, notify, telegram_bot
 from .asr_types import RawSegment, raw_from_json
 from .audio_chunk import split_wav_for_runpod
 from .audio_convert import to_16k_mono_wav_bytes
@@ -176,6 +176,10 @@ async def _startup() -> None:
     # И таблицу событий: пишем в неё из горячего пути, создавать её там поздно.
     if settings.analytics:
         events.init_db()
+    # И таблицу языковых предпочтений бота — та же логика: писать в неё
+    # начинаем с первого сообщения пользователя, таблица должна уже быть.
+    if settings.telegram_bot_token:
+        bot_users.init_db()
     if (settings.notify_enabled and settings.telegram_bot_token
             and settings.notify_interval_hours > 0):
         import asyncio

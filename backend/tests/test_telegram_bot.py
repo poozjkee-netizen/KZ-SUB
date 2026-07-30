@@ -8,7 +8,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import licenses, telegram_bot  # noqa: E402
+from app import bot_users, licenses, telegram_bot  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.licenses import LicenseType  # noqa: E402
 
@@ -22,6 +22,8 @@ def _fresh():
     _n[0] += 1
     licenses.configure(os.path.join(_tmpdir, f"lic_{_n[0]}.db"))
     licenses.init_db()
+    bot_users.configure(os.path.join(_tmpdir, f"bot_users_{_n[0]}.db"))
+    bot_users.init_db()
     _sent.clear()
     settings.telegram_admin_ids = "111"
     settings.telegram_bot_token = "test-token"  # чтобы _call не жаловался в логах
@@ -50,8 +52,48 @@ def _sent_texts(chat_id=None):
     return [s[2] for s in _sent if s[0] == "send" and (chat_id is None or str(s[1]) == str(chat_id))]
 
 
+def test_first_message_shows_language_picker_before_anything_else():
+    """Первое сообщение нового пользователя — только выбор языка.
+
+    Даже если это сразу /demo: команда не должна выполниться, пока язык не
+    выбран, иначе бот заговорит на языке, который никто не выбирал.
+    """
+    _fresh(); _patch_network()
+    update = {"message": {"chat": {"id": 1}, "from": {"id": 42}, "text": "/demo"}}
+    telegram_bot.handle_update(update)
+
+    assert licenses.find_by_email("tg:42", LicenseType.TRIAL) is None
+    assert any("Тілді таңдаңыз" in t or "Выберите язык" in t for t in _sent_texts(1))
+
+
+def test_choosing_language_stores_it_and_shows_welcome():
+    _fresh(); _patch_network()
+    pick = {"callback_query": {
+        "id": "cqL", "data": "lang:kk",
+        "from": {"id": 42}, "message": {"chat": {"id": 1}, "message_id": 1},
+    }}
+    telegram_bot.handle_update(pick)
+    assert bot_users.get_lang(42) == "kk"
+    edits = [s[2] for s in _sent if s[0] == "edit"]
+    assert any("NP SUB" in t for t in edits)
+
+    # Кнопки выбора языка убраны из отредактированного сообщения.
+    kb = [s[3] for s in _sent if s[0] == "edit"][0]
+    assert kb == {"inline_keyboard": []}
+
+
+def test_lang_command_reprompts_even_with_language_already_set():
+    _fresh(); _patch_network()
+    bot_users.set_lang(42, "ru")
+    update = {"message": {"chat": {"id": 1}, "from": {"id": 42}, "text": "/lang"}}
+    telegram_bot.handle_update(update)
+    assert any("Тілді таңдаңыз" in t or "Выберите язык" in t for t in _sent_texts(1))
+    assert bot_users.get_lang(42) == "ru"  # /lang сам по себе ничего не меняет
+
+
 def test_demo_issues_key_once_per_account():
     _fresh(); _patch_network()
+    bot_users.set_lang(42, "ru")            # язык уже выбран — гейт не мешает
     update = {"message": {"chat": {"id": 1}, "from": {"id": 42}, "text": "/demo"}}
 
     telegram_bot.handle_update(update)
@@ -63,6 +105,35 @@ def test_demo_issues_key_once_per_account():
     telegram_bot.handle_update(update)  # повторный /demo — второй ключ не выдаём
     assert len(licenses.list_licenses()) == 1
     assert any("уже был выдан" in t for t in _sent_texts(1))
+
+
+def test_demo_message_offers_a_direct_path_to_buy():
+    """Демо не должно быть тупиком: рядом с ключом сразу кнопка к покупке."""
+    _fresh(); _patch_network()
+    bot_users.set_lang(42, "ru")
+    update = {"message": {"chat": {"id": 1}, "from": {"id": 42}, "text": "/demo"}}
+    telegram_bot.handle_update(update)
+
+    kb = [s[3] for s in _sent if s[0] == "send" and str(s[1]) == "1"][0]
+    buttons = kb["inline_keyboard"][0]
+    assert any(b["callback_data"] == "buy:1:42" for b in buttons)
+
+    _sent.clear()
+    buy_click = {"callback_query": {
+        "id": "cqB", "data": "buy:1:42",
+        "from": {"id": 42}, "message": {"chat": {"id": 1}, "message_id": 2},
+    }}
+    telegram_bot.handle_update(buy_click)
+    assert any("Standard" in t for t in _sent_texts(1))
+
+
+def test_kazakh_speaker_gets_kazakh_texts():
+    _fresh(); _patch_network()
+    bot_users.set_lang(777, "kk")
+    update = {"message": {"chat": {"id": 5}, "from": {"id": 777}, "text": "/demo"}}
+    telegram_bot.handle_update(update)
+    # "кілтіңіз" встречается только в казахском тексте демо-сообщения.
+    assert any("кілтіңіз" in t for t in _sent_texts(5))
 
 
 def test_buy_then_admin_approve_issues_standard_key():
@@ -122,6 +193,7 @@ def test_reject_does_not_issue_key():
 
 def test_whoami_replies_with_id():
     _fresh(); _patch_network()
+    bot_users.set_lang(777, "ru")
     update = {"message": {"chat": {"id": 3}, "from": {"id": 777}, "text": "/whoami"}}
     telegram_bot.handle_update(update)
     assert any("777" in t for t in _sent_texts(3))
@@ -129,6 +201,7 @@ def test_whoami_replies_with_id():
 
 def test_unknown_command_gets_welcome():
     _fresh(); _patch_network()
+    bot_users.set_lang(777, "ru")
     update = {"message": {"chat": {"id": 3}, "from": {"id": 777}, "text": "что это"}}
     telegram_bot.handle_update(update)
     assert any("NP SUB" in t for t in _sent_texts(3))
