@@ -330,5 +330,14 @@ class Settings:
     # о покупке лучше, чем текст одной строкой в чате.
     landing_url: str = _get("LANDING_URL", "https://poozjkee-netizen.github.io/KZ-SUB/")
 
+    # Прямая ссылка на установщик панели. Имя файла БЕЗ версии: ссылка одна и та
+    # же в боте, на лендинге и в переписке, а новая сборка просто заменяет файл
+    # (см. scripts/build-zxp.sh). Telegram умеет отправлять документ по URL,
+    # поэтому отдельная копия рядом со шлюзом не нужна.
+    installer_url: str = _get(
+        "INSTALLER_URL",
+        "https://poozjkee-netizen.github.io/KZ-SUB/download/NP-SUB-installer.zip",
+    )
+
 
 settings = Settings()

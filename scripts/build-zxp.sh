@@ -89,8 +89,20 @@ chmod +x "$STAGE/install-macos.command"
 ( cd "$DIST" && zip -r -q "NP-SUB-$VERSION-installer.zip" "NP-SUB-$VERSION-installer" )
 rm -rf "$STAGE"
 
+# 4. Копия для раздачи: сайт и Telegram-бот берут установщик по ОДНОЙ постоянной
+# ссылке, поэтому имя файла без версии. Иначе каждая новая сборка ломала бы
+# ссылку на лендинге и в боте, а версия и так лежит внутри архива (README.txt).
+PUBLIC_DIR="$ROOT/site/download"
+PUBLIC_ZIP="$PUBLIC_DIR/NP-SUB-installer.zip"
+mkdir -p "$PUBLIC_DIR"
+cp "$INSTALLER_ZIP" "$PUBLIC_ZIP"
+printf '%s\n' "$VERSION" > "$PUBLIC_DIR/VERSION"
+
 echo ""
 echo "Готово:"
 echo "  $ZXP"
 echo "  $INSTALLER_ZIP   (установщик одним кликом — рекомендуется клиентам)"
-echo "Раздавай пользователям + инструкцию из docs/DISTRIBUTION.md"
+echo "  $PUBLIC_ZIP   (для сайта и бота — закоммить и запушь)"
+echo ""
+echo "Чтобы раздача обновилась:"
+echo "  git add site/download && git commit -m \"Обнови установщик до $VERSION\" && git push"

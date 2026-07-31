@@ -43,6 +43,11 @@ def _patch_network():
         _sent.append(("answer", cq_id, text))
         return {"ok": True}
 
+    def fake_document(chat_id, document, caption=""):
+        _sent.append(("document", chat_id, document, caption))
+        return {"ok": True}
+
+    telegram_bot.send_document = fake_document
     telegram_bot.send_message = fake_send
     telegram_bot.edit_message_text = fake_edit
     telegram_bot.answer_callback_query = fake_answer
@@ -115,7 +120,7 @@ def test_demo_message_offers_a_direct_path_to_buy():
     telegram_bot.handle_update(update)
 
     kb = [s[3] for s in _sent if s[0] == "send" and str(s[1]) == "1"][0]
-    buttons = kb["inline_keyboard"][0]
+    buttons = [b for row in kb["inline_keyboard"] for b in row]
     assert any(b["callback_data"] == "buy:1:42" for b in buttons)
 
     _sent.clear()
@@ -125,6 +130,52 @@ def test_demo_message_offers_a_direct_path_to_buy():
     }}
     telegram_bot.handle_update(buy_click)
     assert any("Standard" in t for t in _sent_texts(1))
+
+
+def test_key_message_offers_the_plugin_first():
+    """Ключ бесполезен без панели, поэтому «скачать» стоит выше «купить»."""
+    _fresh(); _patch_network()
+    bot_users.set_lang(42, "ru")
+    telegram_bot.handle_update(
+        {"message": {"chat": {"id": 1}, "from": {"id": 42}, "text": "/demo"}})
+
+    kb = [s[3] for s in _sent if s[0] == "send" and str(s[1]) == "1"][0]
+    rows = kb["inline_keyboard"]
+    assert rows[0][0]["callback_data"] == "dl:1:42", "скачивание должно быть первым"
+    assert rows[1][0]["callback_data"] == "buy:1:42"
+
+
+def test_download_command_sends_the_installer_file():
+    _fresh(); _patch_network()
+    bot_users.set_lang(42, "ru")
+    telegram_bot.handle_update(
+        {"message": {"chat": {"id": 1}, "from": {"id": 42}, "text": "/download"}})
+
+    docs = [s for s in _sent if s[0] == "document"]
+    assert docs, "установщик должен уйти файлом"
+    assert docs[0][2] == settings.installer_url
+    assert "install-windows.bat" in docs[0][3]
+
+
+def test_download_falls_back_to_a_link_when_telegram_cannot_fetch():
+    """Если хостинг недоступен для Telegram, ссылка всё равно доводит до цели."""
+    _fresh(); _patch_network()
+    bot_users.set_lang(42, "ru")
+    telegram_bot.send_document = lambda chat_id, document, caption="": {"ok": False,
+                                                                        "error": "bad url"}
+    telegram_bot.handle_update(
+        {"message": {"chat": {"id": 1}, "from": {"id": 42}, "text": "/download"}})
+    assert any(settings.installer_url in text for text in _sent_texts(1))
+
+
+def test_download_button_sends_the_file_too():
+    _fresh(); _patch_network()
+    bot_users.set_lang(42, "ru")
+    telegram_bot.handle_update({"callback_query": {
+        "id": "cqD", "data": "dl:1:42",
+        "from": {"id": 42}, "message": {"chat": {"id": 1}, "message_id": 3},
+    }})
+    assert any(s[0] == "document" for s in _sent)
 
 
 def test_kazakh_speaker_gets_kazakh_texts():

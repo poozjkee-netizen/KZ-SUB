@@ -90,6 +90,18 @@ def send_message(chat_id, text: str, reply_markup: dict | None = None) -> dict:
     return _call("sendMessage", payload)
 
 
+def send_document(chat_id, document: str, caption: str = "") -> dict:
+    """Отправляет файл по публичному URL — Telegram скачивает его сам.
+
+    Так установщик не нужно держать рядом со шлюзом: единственный источник —
+    тот же адрес, что и на лендинге.
+    """
+    payload = {"chat_id": chat_id, "document": document, "parse_mode": "HTML"}
+    if caption:
+        payload["caption"] = caption
+    return _call("sendDocument", payload)
+
+
 def edit_message_text(chat_id, message_id, text: str, reply_markup: dict | None = None) -> dict:
     payload = {"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "HTML"}
     if reply_markup is not None:
@@ -119,11 +131,19 @@ def _is_admin(user_id) -> bool:
     return str(user_id) in _admin_ids()
 
 
-def _buy_kb(chat_id, user_id, lang: str) -> dict:
-    """Кнопка «к покупке» — приклеивается к /demo, чтобы демо вело к следующему
-    шагу, а не заканчивалось тупиком после того, как минуты кончатся."""
-    label = _t(lang, f"Standard — {STANDARD_PRICE_KZT} ₸ →", f"Standard — {STANDARD_PRICE_KZT} ₸ →")
-    return _kb([(label, f"buy:{chat_id}:{user_id}")])
+def _after_key_kb(chat_id, user_id, lang: str) -> dict:
+    """Кнопки под сообщением с ключом: сначала скачать плагин, потом купить.
+
+    Порядок повторяет реальные шаги: ключ бесполезен, пока панель не
+    установлена. Кнопка покупки рядом, чтобы демо не заканчивалось тупиком,
+    когда минуты кончатся.
+    """
+    return {"inline_keyboard": [
+        [{"text": _t(lang, "⬇ Скачать плагин", "⬇ Плагинді жүктеу"),
+          "callback_data": f"dl:{chat_id}:{user_id}"}],
+        [{"text": f"Standard — {STANDARD_PRICE_KZT} ₸ →",
+          "callback_data": f"buy:{chat_id}:{user_id}"}],
+    ]}
 
 
 def _welcome_text(lang: str) -> str:
@@ -132,6 +152,7 @@ def _welcome_text(lang: str) -> str:
         ru=(
             "<b>NP SUB</b> — субтитры на казахском для Premiere Pro.\n\n"
             "/demo — бесплатный ключ на 3 минуты\n"
+            "/download — скачать плагин для Premiere Pro\n"
             f"/buy — тариф Standard (60 мин или 30 дней) — {STANDARD_PRICE_KZT} ₸\n"
             "/whoami — узнать свой Telegram ID\n"
             "/lang — сменить язык\n\n"
@@ -140,6 +161,7 @@ def _welcome_text(lang: str) -> str:
         kk=(
             "<b>NP SUB</b> — Premiere Pro-ға арналған қазақша субтитрлер.\n\n"
             "/demo — тегін кілт, 3 минут\n"
+            "/download — Premiere Pro-ға арналған плагинді жүктеу\n"
             f"/buy — Standard тарифі (60 минут немесе 30 күн) — {STANDARD_PRICE_KZT} ₸\n"
             "/whoami — Telegram ID-ыңызды білу\n"
             "/lang — тілді ауыстыру\n\n"
@@ -152,7 +174,7 @@ def _welcome_text(lang: str) -> str:
 def _handle_demo(chat_id, user_id, lang: str) -> None:
     email_key = f"tg:{user_id}"
     existing = licenses.find_by_email(email_key, type_=LicenseType.TRIAL)
-    kb = _buy_kb(chat_id, user_id, lang)
+    kb = _after_key_kb(chat_id, user_id, lang)
     if existing is not None:
         send_message(
             chat_id,
@@ -225,6 +247,37 @@ def _handle_whoami(chat_id, user_id, lang: str) -> None:
     ))
 
 
+def _handle_download(chat_id, lang: str) -> None:
+    """Присылает установщик файлом; при неудаче — ссылкой.
+
+    Файл в чате удобнее ссылки (особенно с телефона), но Telegram может не
+    достучаться до хостинга — тогда ссылка всё равно доводит человека до цели.
+    """
+    caption = _t(
+        lang,
+        ru=("<b>Установщик NP SUB</b>\n\n"
+            "1. Распакуйте архив\n"
+            "2. Windows — запустите <code>install-windows.bat</code>\n"
+            "    macOS — <code>install-macos.command</code>\n"
+            "3. Premiere → меню «Окно» → NP SUB → введите ключ\n\n"
+            "Premiere Pro 2020 и новее, Windows и macOS."),
+        kk=("<b>NP SUB орнатқышы</b>\n\n"
+            "1. Мұрағатты ашыңыз\n"
+            "2. Windows — <code>install-windows.bat</code> файлын іске қосыңыз\n"
+            "    macOS — <code>install-macos.command</code>\n"
+            "3. Premiere → «Window» мәзірі → NP SUB → кілтті енгізіңіз\n\n"
+            "Premiere Pro 2020 және жаңалары, Windows пен macOS."),
+    )
+    result = send_document(chat_id, settings.installer_url, caption)
+    if not result.get("ok"):
+        logger.warning("Не удалось отправить установщик файлом: %s", result.get("error"))
+        send_message(chat_id, _t(
+            lang,
+            ru=f"Скачать установщик: {settings.installer_url}\n\n{caption}",
+            kk=f"Орнатқышты жүктеу: {settings.installer_url}\n\n{caption}",
+        ))
+
+
 def _handle_lang_prompt(chat_id) -> None:
     send_message(chat_id, LANG_PROMPT_TEXT, reply_markup=LANG_KB)
 
@@ -245,6 +298,15 @@ def _handle_lang_pick(cq: dict) -> None:
         message["chat"]["id"], message["message_id"],
         _welcome_text(lang), reply_markup={"inline_keyboard": []},
     )
+
+
+def _handle_download_click(cq: dict) -> None:
+    """Кнопка «Скачать плагин» под сообщением с ключом."""
+    cq_id = cq["id"]
+    _, chat_id, user_id = cq["data"].split(":")
+    lang = bot_users.get_lang(user_id)
+    answer_callback_query(cq_id)
+    _handle_download(chat_id, lang)
 
 
 def _handle_buy_click(cq: dict) -> None:
@@ -361,6 +423,8 @@ def handle_update(update: dict) -> None:
                 _handle_demo(chat_id, user_id, lang)
             elif text.startswith("/buy"):
                 _handle_buy(chat_id, user_id, lang)
+            elif text.startswith("/download"):
+                _handle_download(chat_id, lang)
             elif text.startswith("/whoami"):
                 _handle_whoami(chat_id, user_id, lang)
             else:
@@ -370,6 +434,8 @@ def handle_update(update: dict) -> None:
             data = cq.get("data", "")
             if data.startswith("lang:"):
                 _handle_lang_pick(cq)
+            elif data.startswith("dl:"):
+                _handle_download_click(cq)
             elif data.startswith("buy:"):
                 _handle_buy_click(cq)
             elif data.startswith("pay:"):
