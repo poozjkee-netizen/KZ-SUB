@@ -21,6 +21,7 @@
 | Собрать/подписать `.zxp` и раздать клиентам, выдать ключи | [`DISTRIBUTION.md`](DISTRIBUTION.md) |
 | Выпустить релиз (панель / шлюз / воркер) | [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) |
 | Разобраться с тарифами и экономикой | [`MONETIZATION.md`](MONETIZATION.md) |
+| Снять ролик или написать пост про продукт | [`CONTENT.md`](CONTENT.md) |
 | Выбрать модель распознавания (мы, ISSAI, Yandex, CapCut) | [`ASR_PROVIDERS.md`](ASR_PROVIDERS.md) |
 | Посмотреть план развития (общий) | [`ROADMAP.md`](ROADMAP.md) |
 | Посмотреть детальные задачи по приоритетам | [`PROJECT.md`](PROJECT.md) + [`tasks/`](tasks/) |
