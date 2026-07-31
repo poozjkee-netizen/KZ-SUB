@@ -95,6 +95,117 @@ def test_disabled_analytics_writes_nothing():
         settings.analytics = old
 
 
+def _step_users(fn, step):
+    return next(s.users for s in fn.steps if s.step == step)
+
+
+def test_funnel_counts_people_not_clicks():
+    """Один человек, нажавший «скачать» трижды, — это один человек."""
+    _fresh_db()
+    events.record_step(1, events.STEP_START, source="dock")
+    events.record_step(1, events.STEP_LANG, lang="ru")
+    for _ in range(3):
+        events.record_step(1, events.STEP_DOWNLOAD)
+    events.record_step(2, events.STEP_START, source="dock")
+
+    fn = events.funnel(days=1)
+    assert _step_users(fn, events.STEP_START) == 2
+    assert _step_users(fn, events.STEP_DOWNLOAD) == 1
+    assert fn.sources == [("dock", 2)]
+
+
+def test_activation_is_derived_from_actual_runs():
+    """«Сделал субтитры» нельзя отметить в боте — только сшив ключ с прогоном."""
+    _fresh_db()
+    events.record_step(1, events.STEP_DEMO, api_key="key-a")
+    events.record_step(2, events.STEP_DEMO, api_key="key-b")
+    events.record_run("key-a", "ok", audio_seconds=60)
+
+    fn = events.funnel(days=1)
+    assert _step_users(fn, events.STEP_DEMO) == 2
+    assert _step_users(fn, events.STEP_ACTIVATED) == 1, "взял ключ ≠ воспользовался"
+
+
+def test_failed_run_is_not_an_activation():
+    _fresh_db()
+    events.record_step(1, events.STEP_DEMO, api_key="key-a")
+    events.record_run("key-a", "error", reason="http_402")
+    assert _step_users(events.funnel(days=1), events.STEP_ACTIVATED) == 0
+
+
+def test_activation_counts_runs_outside_the_window():
+    """Вчерашняя регистрация + сегодняшний прогон — это активация, а не провал."""
+    _fresh_db()
+    events.record_step(1, events.STEP_DEMO, api_key="key-a")
+    events.record_run("key-a", "ok", audio_seconds=60)
+    # Прогон «состарим» так, чтобы он не попал в окно, а шаг — попал.
+    with events._connect() as conn:  # noqa: SLF001 — правим время ради проверки
+        conn.execute("UPDATE runs SET at = ?", (time.time() - 30 * 86400,))
+    assert _step_users(events.funnel(days=1), events.STEP_ACTIVATED) == 1
+
+
+def test_biggest_drop_points_at_the_step_to_fix():
+    _fresh_db()
+    for uid in range(10):
+        events.record_step(uid, events.STEP_START)
+    for uid in range(9):
+        events.record_step(uid, events.STEP_LANG)
+    for uid in range(2):            # здесь теряем семерых — самый большой обрыв
+        events.record_step(uid, events.STEP_DEMO)
+    for uid in range(2):
+        events.record_step(uid, events.STEP_DOWNLOAD)
+
+    before, after, lost = events.funnel(days=1).biggest_drop
+    assert (before.step, after.step, lost) == (events.STEP_LANG, events.STEP_DEMO, 7)
+
+
+def test_share_is_counted_from_the_entry_step():
+    """Шаги не вложены строго — доля от предыдущего давала бы >100%."""
+    _fresh_db()
+    for uid in range(4):
+        events.record_step(uid, events.STEP_START)
+    events.record_step(50, events.STEP_BUY)   # пришёл сразу к покупке
+    fn = events.funnel(days=1)
+    assert abs(fn.share(fn.steps[0]) - 1.0) < 1e-9
+    assert fn.entered == 4
+
+
+def test_empty_funnel_does_not_divide_by_zero():
+    _fresh_db()
+    fn = events.funnel(days=1)
+    assert fn.entered == 0
+    assert fn.share(fn.steps[0]) == 0.0
+    assert fn.purchase_rate == 0.0
+    assert fn.biggest_drop is None
+
+
+def test_funnel_stores_no_raw_telegram_id():
+    _fresh_db()
+    events.record_step(123456789, events.STEP_START)
+    with events._connect() as conn:  # noqa: SLF001
+        row = conn.execute("SELECT user_hash FROM funnel").fetchone()
+    assert "123456789" not in row["user_hash"]
+
+
+def test_old_steps_fall_out_of_the_window():
+    _fresh_db()
+    events.record_step(1, events.STEP_START)
+    with events._connect() as conn:  # noqa: SLF001
+        conn.execute("UPDATE funnel SET at = ?", (time.time() - 40 * 86400,))
+    assert events.funnel(days=30).entered == 0
+
+
+def test_disabled_analytics_writes_no_steps():
+    _fresh_db()
+    old = settings.analytics
+    try:
+        settings.analytics = False
+        events.record_step(1, events.STEP_START)
+        assert events.funnel(days=1).entered == 0
+    finally:
+        settings.analytics = old
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

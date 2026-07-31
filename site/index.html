@@ -708,7 +708,7 @@ footer a:hover { color: var(--lime); }
             <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg><span data-i18n="p1_2">Выдаётся мгновенно в Telegram</span></li>
             <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg><span data-i18n="p1_3">Без карты и без автосписаний</span></li>
           </ul>
-          <a class="btn btn-ghost" href="#" data-bot data-i18n="p1_cta">Получить демо-ключ</a>
+          <a class="btn btn-ghost" href="#" data-bot="price_demo" data-i18n="p1_cta">Получить демо-ключ</a>
         </div>
         <div class="plan featured">
           <span class="plan-name">Standard</span>
@@ -720,7 +720,7 @@ footer a:hover { color: var(--lime); }
             <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg><span data-i18n="p2_3">Оплата Kaspi, ключ приходит в Telegram</span></li>
             <li><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5"/></svg><span data-i18n="p2_4">Остаток минут виден прямо в панели</span></li>
           </ul>
-          <a class="btn btn-primary" href="#" data-bot data-i18n="p2_cta">Купить доступ</a>
+          <a class="btn btn-primary" href="#" data-bot="price_buy" data-i18n="p2_cta">Купить доступ</a>
         </div>
       </div>
     </div>
@@ -790,7 +790,7 @@ footer a:hover { color: var(--lime); }
       <p class="mono rise"><span class="tick">◆</span> <span data-i18n="fin_kicker">Тегін көріңіз</span></p>
       <h2 class="rise" data-i18n="fin_h2">Проверьте на своём ролике за три минуты.</h2>
       <p class="lead rise" data-i18n="fin_lead">Демо-ключ выдаётся сразу и ничего не стоит. Если субтитры вам не подойдут — вы просто ничего не заплатите.</p>
-      <p class="rise"><a class="btn btn-primary" href="#" data-bot data-i18n="fin_cta">Взять демо в Telegram</a></p>
+      <p class="rise"><a class="btn btn-primary" href="#" data-bot="final" data-i18n="fin_cta">Взять демо в Telegram</a></p>
     </div>
   </section>
 
@@ -798,11 +798,11 @@ footer a:hover { color: var(--lime); }
 
 <footer>
   <span data-i18n="foot_1">NP SUB · Қазақша субтитрлер</span>
-  <span><a href="#" data-bot>Telegram</a> · <a href="mailto:poozjkee@gmail.com">poozjkee@gmail.com</a></span>
+  <span><a href="#" data-bot="footer">Telegram</a> · <a href="mailto:poozjkee@gmail.com">poozjkee@gmail.com</a></span>
 </footer>
 
 <div class="dock" id="dock">
-  <a class="btn btn-primary" href="#" data-bot data-i18n="dock_cta">Взять демо — 3 минуты</a>
+  <a class="btn btn-primary" href="#" data-bot="dock" data-i18n="dock_cta">Взять демо — 3 минуты</a>
 </div>
 
 <script>
@@ -1044,9 +1044,15 @@ var I18N = {
   apply(I18N[saved] ? saved : byBrowser);
 })();
 
-/* Ссылки на бота — из одной константы наверху. */
+/*
+ * Ссылки на бота — из одной константы наверху. К каждой добавляется метка
+ * кнопки (?start=dock и т.п.): Telegram доставит её боту как «/start dock»,
+ * и в отчёте `python -m app.events funnel` будет видно, какая кнопка приводит
+ * людей. Свои логи страница дать не может — она лежит на GitHub Pages.
+ */
 document.querySelectorAll('[data-bot]').forEach(function (a) {
-  a.setAttribute('href', BOT_URL);
+  var source = a.getAttribute('data-bot') || 'site';
+  a.setAttribute('href', BOT_URL + '?start=' + source);
   a.setAttribute('target', '_blank');
   a.setAttribute('rel', 'noopener');
 });

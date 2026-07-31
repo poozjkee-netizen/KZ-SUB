@@ -28,7 +28,7 @@ import logging
 import urllib.error
 import urllib.request
 
-from . import bot_users, licenses
+from . import bot_users, events, licenses
 from .config import settings
 from .licenses import LicenseType
 
@@ -176,6 +176,8 @@ def _handle_demo(chat_id, user_id, lang: str) -> None:
     existing = licenses.find_by_email(email_key, type_=LicenseType.TRIAL)
     kb = _after_key_kb(chat_id, user_id, lang)
     if existing is not None:
+        events.record_step(user_id, events.STEP_DEMO,
+                           api_key=existing.api_key, lang=lang)
         send_message(
             chat_id,
             _t(
@@ -191,6 +193,7 @@ def _handle_demo(chat_id, user_id, lang: str) -> None:
         )
         return
     lic = licenses.create_from_plan(email_key, DEMO_PLAN)
+    events.record_step(user_id, events.STEP_DEMO, api_key=lic.api_key, lang=lang)
     send_message(
         chat_id,
         _t(
@@ -213,6 +216,7 @@ def _handle_demo(chat_id, user_id, lang: str) -> None:
 
 
 def _handle_buy(chat_id, user_id, lang: str) -> None:
+    events.record_step(user_id, events.STEP_BUY, lang=lang)
     kaspi = settings.kaspi_phone or _t(
         lang,
         "(номер Kaspi не настроен — обратитесь к продавцу)",
@@ -247,12 +251,13 @@ def _handle_whoami(chat_id, user_id, lang: str) -> None:
     ))
 
 
-def _handle_download(chat_id, lang: str) -> None:
+def _handle_download(chat_id, user_id, lang: str) -> None:
     """Присылает установщик файлом; при неудаче — ссылкой.
 
     Файл в чате удобнее ссылки (особенно с телефона), но Telegram может не
     достучаться до хостинга — тогда ссылка всё равно доводит человека до цели.
     """
+    events.record_step(user_id, events.STEP_DOWNLOAD, lang=lang)
     caption = _t(
         lang,
         ru=("<b>Установщик NP SUB</b>\n\n"
@@ -282,6 +287,20 @@ def _handle_lang_prompt(chat_id) -> None:
     send_message(chat_id, LANG_PROMPT_TEXT, reply_markup=LANG_KB)
 
 
+def _source_of(text: str) -> str:
+    """Откуда пришёл человек — из deep-link вида t.me/np_subbot?start=hero.
+
+    Telegram доставляет такую ссылку как обычное сообщение «/start hero», и это
+    единственный способ узнать, какая кнопка лендинга работает: сам лендинг
+    лежит на GitHub Pages и логов не даёт. Без метки — «direct» (человек нашёл
+    бота сам); не /start вовсе — пусто, приписывать такой приход некуда.
+    """
+    if not text.startswith("/start"):
+        return ""
+    parts = text.split()
+    return parts[1][:32] if len(parts) > 1 else "direct"
+
+
 # --- Кнопки (callback_query) --------------------------------------------------
 def _handle_lang_pick(cq: dict) -> None:
     """Выбор языка: сохраняем и сразу заменяем сообщение-выбор приветствием."""
@@ -293,6 +312,7 @@ def _handle_lang_pick(cq: dict) -> None:
     message = cq["message"]
 
     bot_users.set_lang(user_id, lang)
+    events.record_step(user_id, events.STEP_LANG, lang=lang)
     answer_callback_query(cq_id)
     edit_message_text(
         message["chat"]["id"], message["message_id"],
@@ -306,7 +326,7 @@ def _handle_download_click(cq: dict) -> None:
     _, chat_id, user_id = cq["data"].split(":")
     lang = bot_users.get_lang(user_id)
     answer_callback_query(cq_id)
-    _handle_download(chat_id, lang)
+    _handle_download(chat_id, user_id, lang)
 
 
 def _handle_buy_click(cq: dict) -> None:
@@ -326,6 +346,7 @@ def _handle_pay_click(cq: dict) -> None:
     username = from_user.get("username") or from_user.get("first_name") or str(user_id)
     message = cq["message"]
 
+    events.record_step(user_id, events.STEP_PAID, lang=lang)
     answer_callback_query(cq_id, _t(
         lang, "Заявка отправлена, ждите подтверждения.",
         "Өтінім жіберілді, растауды күтіңіз.",
@@ -374,6 +395,8 @@ def _handle_admin_decision(cq: dict, approve: bool) -> None:
         # (двойной клик/гонка) — не плодим лицензии на один и тот же аккаунт.
         existing = licenses.find_by_email(email_key, type_=LicenseType.SUBSCRIPTION)
         lic = existing or licenses.create_from_plan(email_key, STANDARD_PLAN)
+        events.record_step(client_user_id, events.STEP_STANDARD,
+                           api_key=lic.api_key, lang=lang)
         send_message(
             client_chat_id,
             _t(
@@ -416,6 +439,8 @@ def handle_update(update: dict) -> None:
             if not lang:
                 # Первое сообщение от нового пользователя — только выбор языка,
                 # ни один другой ответ ему до этого не показываем.
+                events.record_step(user_id, events.STEP_START,
+                                    source=_source_of(text))
                 _handle_lang_prompt(chat_id)
                 return
 
@@ -424,7 +449,7 @@ def handle_update(update: dict) -> None:
             elif text.startswith("/buy"):
                 _handle_buy(chat_id, user_id, lang)
             elif text.startswith("/download"):
-                _handle_download(chat_id, lang)
+                _handle_download(chat_id, user_id, lang)
             elif text.startswith("/whoami"):
                 _handle_whoami(chat_id, user_id, lang)
             else:

@@ -5,15 +5,26 @@
 лицензии, здесь — то, чего в них нет: частота прогонов, время обработки,
 структура отказов (упёрся в лимит ≠ упал сервис) и удержание по дням.
 
+Кроме прогонов здесь живёт **воронка** — шаги пути от первого касания бота до
+покупки (таблица `funnel`). Без неё видно только последний шаг: «прогонов мало»,
+а на каком шаге теряем людей — неизвестно. Шаг «сделал субтитры» не пишется
+отдельно: он выводится соединением воронки с таблицей прогонов по хешу ключа.
+
 Что НЕ пишем принципиально: ни аудио, ни распознанный текст, ни сам ключ.
 Ключ и устройство хранятся только как короткий хеш — этого хватает, чтобы
 считать уникальных пользователей и повторные визиты, но по базе нельзя
 восстановить ни ключ, ни содержимое ролика.
 
+Оговорка про воронку: Telegram ID — короткое число, их множество перебирается
+за секунды, поэтому его хеш защищает не от того, у кого уже есть эта БД, а от
+случайного взгляда и от утечки списка ID при выгрузке. Он нужен, чтобы считать
+людей, а не чтобы обещать анонимность, которой там нет.
+
 Только stdlib (sqlite3) — модуль обязан оставаться dep-free-тестируемым.
 
 CLI:
     python -m app.events summary --days 7
+    python -m app.events funnel --days 30
     python -m app.events recent --limit 20
 """
 from __future__ import annotations
@@ -29,6 +40,31 @@ from .config import settings
 
 _lock = threading.Lock()
 _db_path: str | None = None
+
+# Шаги воронки. Значения попадают в БД — не переименовывать без миграции,
+# иначе старые записи выпадут из отчёта.
+STEP_START = "start"          # первое касание бота (показан выбор языка)
+STEP_LANG = "lang"            # язык выбран — человек реально начал
+STEP_DEMO = "demo"            # демо-ключ выдан
+STEP_DOWNLOAD = "download"    # установщик отправлен
+STEP_BUY = "buy"              # открыт экран покупки
+STEP_PAID = "paid"            # нажал «Я оплатил» — заявка ушла продавцу
+STEP_STANDARD = "standard"    # ключ Standard выдан
+
+# Порядок шагов в отчёте = порядок пути. STEP_ACTIVATED не записывается:
+# он вычисляется соединением воронки с прогонами по хешу ключа.
+STEP_ACTIVATED = "activated"
+
+FUNNEL_TITLES: list[tuple[str, str]] = [
+    (STEP_START, "Открыли бота"),
+    (STEP_LANG, "Выбрали язык"),
+    (STEP_DEMO, "Взяли демо-ключ"),
+    (STEP_DOWNLOAD, "Скачали установщик"),
+    (STEP_ACTIVATED, "Сделали субтитры"),
+    (STEP_BUY, "Открыли покупку"),
+    (STEP_PAID, "Нажали «оплатил»"),
+    (STEP_STANDARD, "Купили Standard"),
+]
 
 
 def _resolve_db_path() -> str:
@@ -91,6 +127,21 @@ def init_db() -> None:
             """
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_at ON runs(at)")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS funnel (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                at        REAL NOT NULL,
+                user_hash TEXT NOT NULL,
+                step      TEXT NOT NULL,
+                key_hash  TEXT NOT NULL DEFAULT '',
+                lang      TEXT NOT NULL DEFAULT '',
+                source    TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_funnel_at ON funnel(at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_funnel_key ON funnel(key_hash)")
 
 
 def record_run(
@@ -112,29 +163,52 @@ def record_run(
     """
     if not settings.analytics:
         return
-    row = (time.time(), anon(api_key), anon(device_id), license_type, mode,
-           status, reason, float(audio_seconds), float(wall_seconds), int(segments))
+    _safe_write(
+        "INSERT INTO runs (at, key_hash, device_hash, license, mode, status,"
+        " reason, audio_sec, wall_sec, segments)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (time.time(), anon(api_key), anon(device_id), license_type, mode,
+         status, reason, float(audio_seconds), float(wall_seconds), int(segments)),
+    )
+
+
+def record_step(user_id, step: str, *, api_key: str = "", lang: str = "",
+                source: str = "") -> None:
+    """Отметить шаг воронки. Как и record_run, никогда не бросает исключений.
+
+    `api_key` передаётся только на шагах выдачи ключа — по его хешу отчёт потом
+    сшивает воронку с прогонами и понимает, дошёл ли человек до первых субтитров.
+    """
+    if not settings.analytics:
+        return
+    _safe_write(
+        "INSERT INTO funnel (at, user_hash, step, key_hash, lang, source)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (time.time(), anon(f"tg:{user_id}"), step, anon(api_key), lang, source),
+    )
+
+
+def _safe_write(sql: str, row: tuple) -> None:
+    """Вставка, которая не имеет права уронить продукт.
+
+    Если БД недоступна, пользователь всё равно должен получить свои субтитры и
+    свой ключ. Первая же ошибка чаще всего «no such table» на свежем томе
+    (startup не успел или БД пересоздали) — чиним на месте и пробуем ещё раз,
+    иначе учёт молча замолчал бы навсегда, а заметили бы это по пустому отчёту.
+    """
     try:
-        _insert(row)
+        _insert(sql, row)
     except Exception:  # noqa: BLE001
-        # Чаще всего это «no such table» на свежем томе: startup мог не успеть
-        # или БД пересоздали. Чиним на месте и пробуем ещё раз — иначе учёт
-        # молча замолчал бы навсегда, а заметили бы это по пустому отчёту.
         try:
             init_db()
-            _insert(row)
+            _insert(sql, row)
         except Exception:  # noqa: BLE001 — намеренно проглатываем ошибку учёта
             pass
 
 
-def _insert(row: tuple) -> None:
+def _insert(sql: str, row: tuple) -> None:
     with _lock, _connect() as conn:
-        conn.execute(
-            "INSERT INTO runs (at, key_hash, device_hash, license, mode, status,"
-            " reason, audio_sec, wall_sec, segments)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            row,
-        )
+        conn.execute(sql, row)
 
 
 @dataclass
@@ -205,6 +279,88 @@ def summary(days: int = 7) -> Summary:
     )
 
 
+@dataclass
+class FunnelStep:
+    """Один шаг пути: сколько человек до него дошло."""
+    step: str
+    title: str
+    users: int
+
+
+@dataclass
+class Funnel:
+    """Путь от первого касания бота до покупки — где именно теряем людей."""
+    days: int
+    steps: list[FunnelStep]
+    sources: list[tuple[str, int]]
+
+    @property
+    def entered(self) -> int:
+        return self.steps[0].users if self.steps else 0
+
+    def share(self, step: FunnelStep) -> float:
+        """Доля от вошедших. Считаем от начала, а не от предыдущего шага.
+
+        Шаги не вложены строго: покупку можно открыть, не взяв демо. От
+        предыдущего шага тогда получались бы доли больше 100% — бессмыслица.
+        """
+        return (step.users / self.entered) if self.entered else 0.0
+
+    @property
+    def biggest_drop(self) -> tuple[FunnelStep, FunnelStep, int] | None:
+        """Пара соседних шагов с наибольшей потерей людей — куда прикладывать силы."""
+        worst = None
+        for before, after in zip(self.steps, self.steps[1:]):
+            lost = before.users - after.users
+            if lost > 0 and (worst is None or lost > worst[2]):
+                worst = (before, after, lost)
+        return worst
+
+    @property
+    def purchase_rate(self) -> float:
+        bought = self.steps[-1].users if self.steps else 0
+        return (bought / self.entered) if self.entered else 0.0
+
+
+def funnel(days: int = 30) -> Funnel:
+    """Воронка за последние N дней.
+
+    Окно применяется к шагу, а не к прогону: «сделали субтитры» — это те, кто
+    получил ключ за период и хоть когда-нибудь успешно им воспользовался.
+    Иначе вчерашние регистрации выглядели бы провалом только потому, что человек
+    ещё не успел смонтировать ролик.
+    """
+    since = time.time() - days * 86400
+    init_db()
+    with _lock, _connect() as conn:
+        counts = {
+            r["step"]: r["n"]
+            for r in conn.execute(
+                "SELECT step, COUNT(DISTINCT user_hash) AS n FROM funnel"
+                " WHERE at >= ? GROUP BY step",
+                (since,),
+            )
+        }
+        counts[STEP_ACTIVATED] = conn.execute(
+            "SELECT COUNT(DISTINCT f.user_hash) AS n FROM funnel f"
+            " JOIN runs r ON r.key_hash = f.key_hash"
+            " WHERE f.at >= ? AND f.key_hash <> '' AND r.status = 'ok'",
+            (since,),
+        ).fetchone()["n"] or 0
+        sources = conn.execute(
+            "SELECT source, COUNT(DISTINCT user_hash) AS n FROM funnel"
+            " WHERE at >= ? AND source <> '' GROUP BY source ORDER BY n DESC",
+            (since,),
+        ).fetchall()
+
+    return Funnel(
+        days=days,
+        steps=[FunnelStep(step, title, counts.get(step, 0))
+               for step, title in FUNNEL_TITLES],
+        sources=[(r["source"], r["n"]) for r in sources],
+    )
+
+
 def recent(limit: int = 20) -> list[sqlite3.Row]:
     """Последние прогоны — для быстрой отладки «что сейчас происходит»."""
     init_db()
@@ -223,6 +379,9 @@ def _main() -> None:
 
     s = sub.add_parser("summary", help="срез за период")
     s.add_argument("--days", type=int, default=7)
+
+    f = sub.add_parser("funnel", help="воронка: где теряем людей")
+    f.add_argument("--days", type=int, default=30)
 
     r = sub.add_parser("recent", help="последние прогоны")
     r.add_argument("--limit", type=int, default=20)
@@ -243,6 +402,21 @@ def _main() -> None:
             print("  причины отказов:")
             for reason, n in m.reasons:
                 print(f"    {reason}: {n}")
+        return
+
+    if args.cmd == "funnel":
+        fn = funnel(args.days)
+        print(f"Воронка за {fn.days} дн. (человек на шаге, % от вошедших):")
+        for i, step in enumerate(fn.steps, 1):
+            print(f"  {i}. {step.title:<22} {step.users:>4}  {fn.share(step) * 100:>5.0f}%")
+        drop = fn.biggest_drop
+        if drop:
+            before, after, lost = drop
+            print(f"\n  Крупнейший обрыв: «{before.title}» → «{after.title}»: "
+                  f"−{lost} чел.")
+        print(f"  Конверсия в покупку: {fn.purchase_rate * 100:.1f}%")
+        if fn.sources:
+            print("  Источники: " + ", ".join(f"{s} {n}" for s, n in fn.sources))
         return
 
     print(f"{'когда':<20} {'тариф':<12} {'статус':<8} {'причина':<16} "

@@ -8,7 +8,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import bot_users, licenses, telegram_bot  # noqa: E402
+from app import bot_users, events, licenses, telegram_bot  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.licenses import LicenseType  # noqa: E402
 
@@ -24,6 +24,10 @@ def _fresh():
     licenses.init_db()
     bot_users.configure(os.path.join(_tmpdir, f"bot_users_{_n[0]}.db"))
     bot_users.init_db()
+    # Учёт воронки пишет в ту же БД, что и прогоны, — уводим её во временную,
+    # иначе тесты пачкали бы рабочую базу метрик.
+    events.configure(os.path.join(_tmpdir, f"events_{_n[0]}.db"))
+    events.init_db()
     _sent.clear()
     settings.telegram_admin_ids = "111"
     settings.telegram_bot_token = "test-token"  # чтобы _call не жаловался в логах
@@ -240,6 +244,68 @@ def test_reject_does_not_issue_key():
     telegram_bot.handle_update(reject)
     assert licenses.find_by_email("tg:42", LicenseType.SUBSCRIPTION) is None
     assert any("не найдена" in t for t in _sent_texts(1))
+
+
+def test_client_journey_lands_in_the_funnel():
+    """Каждый шаг бота должен быть виден в отчёте — иначе непонятно, где теряем.
+
+    Проходим путь целиком: пришёл по ссылке с закреплённой панели лендинга →
+    выбрал язык → взял демо → скачал установщик → сделал субтитры.
+    """
+    _fresh(); _patch_network()
+    # 1. Первое касание: deep-link t.me/np_subbot?start=dock приходит как текст.
+    telegram_bot.handle_update(
+        {"message": {"chat": {"id": 1}, "from": {"id": 42}, "text": "/start dock"}})
+    # 2. Выбор языка.
+    telegram_bot.handle_update({"callback_query": {
+        "id": "cqL", "data": "lang:ru",
+        "from": {"id": 42}, "message": {"chat": {"id": 1}, "message_id": 1},
+    }})
+    # 3-4. Демо-ключ и установщик.
+    telegram_bot.handle_update(
+        {"message": {"chat": {"id": 1}, "from": {"id": 42}, "text": "/demo"}})
+    telegram_bot.handle_update(
+        {"message": {"chat": {"id": 1}, "from": {"id": 42}, "text": "/download"}})
+
+    fn = events.funnel(days=1)
+    reached = {s.step: s.users for s in fn.steps}
+    assert reached[events.STEP_START] == 1
+    assert reached[events.STEP_LANG] == 1
+    assert reached[events.STEP_DEMO] == 1
+    assert reached[events.STEP_DOWNLOAD] == 1
+    assert fn.sources == [("dock", 1)]
+    assert reached[events.STEP_ACTIVATED] == 0, "субтитров ещё не было"
+
+    # 5. Первый успешный прогон тем самым ключом — активация.
+    lic = licenses.find_by_email("tg:42", LicenseType.TRIAL)
+    events.record_run(lic.api_key, "ok", audio_seconds=60)
+    assert _step_users(events.funnel(days=1), events.STEP_ACTIVATED) == 1
+
+
+def test_purchase_reaches_the_last_funnel_step():
+    _fresh(); _patch_network()
+    bot_users.set_lang(42, "ru")
+    telegram_bot.handle_update({"callback_query": {
+        "id": "cqB", "data": "buy:1:42",
+        "from": {"id": 42}, "message": {"chat": {"id": 1}, "message_id": 2},
+    }})
+    telegram_bot.handle_update({"callback_query": {
+        "id": "cqP", "data": "pay:1:42",
+        "from": {"id": 42}, "message": {"chat": {"id": 1}, "message_id": 3},
+    }})
+    telegram_bot.handle_update({"callback_query": {
+        "id": "cqC", "data": "confirm:1:42",
+        "from": {"id": 111}, "message": {"chat": {"id": 111}, "message_id": 4},
+    }})
+
+    fn = events.funnel(days=1)
+    assert _step_users(fn, events.STEP_BUY) == 1
+    assert _step_users(fn, events.STEP_PAID) == 1
+    assert _step_users(fn, events.STEP_STANDARD) == 1
+
+
+def _step_users(fn, step):
+    return next(s.users for s in fn.steps if s.step == step)
 
 
 def test_whoami_replies_with_id():
