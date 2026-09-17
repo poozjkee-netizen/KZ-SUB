@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NP Brief</title>
+<style>
+  :root {
+    --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; --muted: #6e6e73;
+    --line: #e3e3e6; --accent: #0071e3; --accent-text: #ffffff;
+    --ok: #1c7c3c; --err: #c4362c; --code: #f2f2f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1e; --card: #262629; --text: #f2f2f7; --muted: #9a9aa0;
+      --line: #3a3a3d; --accent: #0a84ff; --accent-text: #ffffff;
+      --ok: #4cd964; --err: #ff6b5e; --code: #1f1f22;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 28px 16px 56px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: -0.2px; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .spacer { flex: 1; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; margin-bottom: 16px;
+  }
+  .row { display: flex; gap: 10px; }
+  input[type=text], input[type=password], select, textarea {
+    width: 100%; padding: 11px 13px; font-size: 15px; color: var(--text);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+    font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button {
+    font: inherit; font-weight: 500; padding: 11px 18px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+    cursor: pointer; white-space: nowrap;
+  }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.icon { padding: 9px 12px; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 10px; }
+  .steps { list-style: none; margin: 0; padding: 0; }
+  .steps li { padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .steps li:last-child { border-bottom: 0; }
+  .steps li.now { color: var(--accent); }
+  .spin { display: inline-block; width: 13px; height: 13px; margin-right: 8px;
+          border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tabs button { padding: 7px 14px; font-size: 14px; border-radius: 999px; }
+  .tabs button.on { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+  .out h2 { font-size: 18px; margin: 22px 0 8px; }
+  .out h3 { font-size: 15px; margin: 18px 0 6px; }
+  .out p, .out li { font-size: 15px; }
+  .out table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  .out th, .out td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
+  .out th { background: var(--code); }
+  .out pre { background: var(--code); padding: 12px; border-radius: 10px; overflow: auto; }
+  .plain { white-space: pre-wrap; font-size: 14px; line-height: 1.65; }
+  .err { color: var(--err); }
+  .ok { color: var(--ok); }
+  .settings { display: none; }
+  .settings.open { display: block; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+  .muted { color: var(--muted); }
+  .badge { font-size: 12px; color: var(--muted); border: 1px solid var(--line);
+           border-radius: 999px; padding: 3px 9px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>NP Brief</h1>
+      <div class="sub">ссылка на ролик → расшифровка → разбор и свой сценарий</div>
+    </div>
+    <div class="spacer"></div>
+    <span id="keyBadge" class="badge"></span>
+    <button class="icon" id="gear" title="Настройки">⚙︎</button>
+  </header>
+
+  <div class="card settings" id="settings">
+    <div class="field">
+      <label for="apiKey">Ключ Anthropic (нужен для разбора; расшифровка работает и без него)</label>
+      <input type="password" id="apiKey" placeholder="sk-ant-… — сохранится на этом маке" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="audience">Под кого делаем свою версию</label>
+      <input type="text" id="audience">
+    </div>
+    <div class="field">
+      <label for="outDir">Куда складывать разборы</label>
+      <input type="text" id="outDir">
+    </div>
+    <div class="field">
+      <label for="whisper">Распознавание, если у ролика нет субтитров</label>
+      <select id="whisper">
+        <option value="large-v3">large-v3 — точнее, но дольше</option>
+        <option value="medium">medium — быстрее</option>
+        <option value="small">small — совсем быстро, грубее</option>
+      </select>
+    </div>
+    <div class="row">
+      <button class="primary" id="saveSettings">Сохранить</button>
+      <button id="closeSettings">Закрыть</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <input type="text" id="url" placeholder="Вставь ссылку: YouTube, Instagram, TikTok…" autofocus>
+      <button class="primary" id="go">Разобрать</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <select id="mode" style="max-width:280px">
+        <option value="auto">Текст: как получится (быстро)</option>
+        <option value="subs">Только субтитры ролика</option>
+        <option value="asr">Только распознавание звука</option>
+      </select>
+      <div class="hint" id="hint" style="margin-top:11px">
+        Ролик может быть на любом языке — разбор всегда на русском.
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="progress" style="display:none">
+    <ul class="steps" id="steps"></ul>
+  </div>
+
+  <div class="card" id="result" style="display:none">
+    <div class="row" style="align-items:center;margin-bottom:12px">
+      <strong id="title"></strong>
+      <div class="spacer"></div>
+      <button id="copy">Скопировать</button>
+      <button id="reveal">Показать в Finder</button>
+    </div>
+    <div id="warn" class="hint err" style="display:none"></div>
+    <div class="tabs" id="tabs">
+      <button data-tab="brief" class="on">Разбор</button>
+      <button data-tab="clean">Чистый текст</button>
+      <button data-tab="timed">С тайм-кодами</button>
+    </div>
+    <div class="out" id="out"></div>
+  </div>
+
+  <div class="hint" style="text-align:center">
+    Разборы лежат в папке из настроек · <a href="#" id="quit">закрыть приложение</a>
+  </div>
+
+</div>
+
+<script>
+var TOKEN = "__TOKEN__";
+var job = null, timer = null, data = {brief: "", clean: "", timed: ""}, tab = "brief", outDir = "";
+
+function api(path, body) {
+  var url = path + (path.indexOf("?") < 0 ? "?" : "&") + "t=" + encodeURIComponent(TOKEN);
+  var opts = body ? {method: "POST", headers: {"Content-Type": "application/json"},
+                     body: JSON.stringify(body)} : {};
+  return fetch(url, opts).then(function (r) { return r.json(); });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Маленький разметчик Markdown: заголовки, таблицы, списки, жирный/курсив.
+// Своими руками, потому что внешние библиотеки тянуть неоткуда — приложение
+// работает без интернета, кроме самих запросов к площадке и модели.
+function md(src) {
+  var lines = esc(src).split("\n"), html = [], i = 0;
+  function inline(t) {
+    return t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+            .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+            .replace(/`([^`]+)`/g, "<code>$1</code>");
+  }
+  while (i < lines.length) {
+    var line = lines[i];
+    var head = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (head) {
+      var level = Math.min(head[1].length + 1, 4);
+      html.push("<h" + level + ">" + inline(head[2]) + "</h" + level + ">");
+      i++; continue;
+    }
+    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+      var cells = function (row) {
+        return row.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|");
+      };
+      var out = "<table><thead><tr>";
+      cells(line).forEach(function (c) { out += "<th>" + inline(c.trim()) + "</th>"; });
+      out += "</tr></thead><tbody>";
+      i += 2;
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+        out += "<tr>";
+        cells(lines[i]).forEach(function (c) { out += "<td>" + inline(c.trim()) + "</td>"; });
+        out += "</tr>"; i++;
+      }
+      html.push(out + "</tbody></table>");
+      continue;
+    }
+    if (/^\s*([-*•]|\d+\.)\s+/.test(line)) {
+      var ordered = /^\s*\d+\./.test(line), items = [];
+      while (i < lines.length && /^\s*([-*•]|\d+\.)\s+/.test(lines[i])) {
+        items.push("<li>" + inline(lines[i].replace(/^\s*([-*•]|\d+\.)\s+/, "")) + "</li>");
+        i++;
+      }
+      html.push((ordered ? "<ol>" : "<ul>") + items.join("") + (ordered ? "</ol>" : "</ul>"));
+      continue;
+    }
+    if (/^\s*>/.test(line)) {
+      html.push("<p class='muted'>" + inline(line.replace(/^\s*>\s?/, "")) + "</p>"); i++; continue;
+    }
+    if (!line.trim()) { i++; continue; }
+    var para = [];
+    while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|\s*\||\s*([-*•]|\d+\.)\s)/.test(lines[i])) {
+      para.push(lines[i]); i++;
+    }
+    html.push("<p>" + inline(para.join(" ")) + "</p>");
+  }
+  return html.join("\n");
+}
+
+function render() {
+  var box = document.getElementById("out");
+  if (tab === "brief") {
+    box.className = "out";
+    box.innerHTML = data.brief ? md(data.brief) : "<p class='muted'>Разбора нет.</p>";
+  } else {
+    box.className = "plain";
+    box.textContent = data[tab] || "—";
+  }
+}
+
+function showSteps(steps, running) {
+  var box = document.getElementById("progress");
+  box.style.display = "block";
+  var list = document.getElementById("steps");
+  list.innerHTML = "";
+  steps.forEach(function (s, idx) {
+    var li = document.createElement("li");
+    var last = idx === steps.length - 1;
+    if (last && running) {
+      li.className = "now";
+      li.innerHTML = "<span class='spin'></span>" + esc(s);
+    } else {
+      li.textContent = "✓ " + s;
+    }
+    list.appendChild(li);
+  });
+}
+
+function finish(res) {
+  document.getElementById("go").disabled = false;
+  document.getElementById("result").style.display = "block";
+  document.getElementById("title").textContent = res.title || "Готово";
+  outDir = res.out_dir;
+  data = {brief: res.brief || "", clean: res.clean || "", timed: res.timed || ""};
+  var warn = document.getElementById("warn");
+  if (res.analysis_error) {
+    warn.style.display = "block";
+    warn.textContent = res.analysis_error;
+    tab = res.brief ? "brief" : "clean";
+  } else {
+    warn.style.display = "none";
+    tab = "brief";
+  }
+  document.querySelectorAll("#tabs button").forEach(function (b) {
+    b.className = b.dataset.tab === tab ? "on" : "";
+  });
+  render();
+}
+
+function poll() {
+  api("/api/state?job=" + encodeURIComponent(job)).then(function (state) {
+    var j = state.job;
+    if (!j) { return; }
+    showSteps(j.steps, j.status === "running");
+    if (j.status === "running") { return; }
+    clearInterval(timer); timer = null;
+    if (j.status === "error") {
+      document.getElementById("go").disabled = false;
+      showSteps(j.steps.concat(["Ошибка: " + j.error]), false);
+      document.getElementById("steps").lastChild.className = "err";
+    } else {
+      finish(j.result);
+    }
+  });
+}
+
+document.getElementById("go").onclick = function () {
+  var url = document.getElementById("url").value.trim();
+  if (!url) { document.getElementById("url").focus(); return; }
+  this.disabled = true;
+  document.getElementById("result").style.display = "none";
+  api("/api/run", {url: url, mode: document.getElementById("mode").value}).then(function (r) {
+    if (r.error) {
+      document.getElementById("go").disabled = false;
+      showSteps(["Ошибка: " + r.error], false);
+      return;
+    }
+    job = r.job;
+    showSteps(["Начинаю…"], true);
+    timer = setInterval(poll, 800);
+  });
+};
+
+document.getElementById("url").addEventListener("keydown", function (e) {
+  if (e.key === "Enter") { document.getElementById("go").click(); }
+});
+
+document.querySelectorAll("#tabs button").forEach(function (b) {
+  b.onclick = function () {
+    tab = b.dataset.tab;
+    document.querySelectorAll("#tabs button").forEach(function (x) {
+      x.className = x === b ? "on" : "";
+    });
+    render();
+  };
+});
+
+document.getElementById("copy").onclick = function () {
+  navigator.clipboard.writeText(data[tab] || "").then(function () {
+    var btn = document.getElementById("copy");
+    btn.textContent = "Скопировано";
+    setTimeout(function () { btn.textContent = "Скопировать"; }, 1500);
+  });
+};
+
+document.getElementById("reveal").onclick = function () {
+  api("/api/reveal", {path: outDir});
+};
+
+document.getElementById("gear").onclick = function () {
+  document.getElementById("settings").classList.toggle("open");
+};
+document.getElementById("closeSettings").onclick = function () {
+  document.getElementById("settings").classList.remove("open");
+};
+
+document.getElementById("saveSettings").onclick = function () {
+  api("/api/settings", {
+    api_key: document.getElementById("apiKey").value,
+    audience: document.getElementById("audience").value,
+    out_dir: document.getElementById("outDir").value,
+    whisper: document.getElementById("whisper").value
+  }).then(function (r) {
+    document.getElementById("apiKey").value = "";
+    applySettings(r.settings);
+    document.getElementById("settings").classList.remove("open");
+  });
+};
+
+function applySettings(s) {
+  document.getElementById("audience").value = s.audience || "";
+  document.getElementById("outDir").value = s.out_dir || "";
+  document.getElementById("whisper").value = s.whisper || "large-v3";
+  var badge = document.getElementById("keyBadge");
+  badge.textContent = s.api_key_set ? "ключ " + s.api_key_hint : "ключ не задан";
+  badge.className = "badge" + (s.api_key_set ? "" : " err");
+  if (!s.api_key_set) {
+    document.getElementById("hint").innerHTML =
+      "Без ключа Anthropic будет только расшифровка. Добавь ключ в настройках (⚙︎).";
+  }
+}
+
+document.getElementById("quit").onclick = function (e) {
+  e.preventDefault();
+  api("/api/quit");
+  document.body.innerHTML = "<div class='wrap'><div class='card'>NP Brief закрыт. " +
+    "Можно закрыть вкладку.</div></div>";
+};
+
+api("/api/state").then(function (s) { applySettings(s.settings); });
+</script>
+</body>
+</html>

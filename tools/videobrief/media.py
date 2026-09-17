@@ -129,11 +129,14 @@ def fetch_subtitles(url: str, lang: str, is_auto: bool, workdir: str) -> str:
 def fetch_audio(url: str, workdir: str) -> str:
     """Скачивает только аудиодорожку (mp3) — для распознавания видео не нужно."""
     ensure_ytdlp()
-    if shutil.which("ffmpeg") is None:
-        raise MediaError("Не найден ffmpeg — без него yt-dlp не вытащит аудио.")
     template = os.path.join(workdir, "audio.%(ext)s")
-    _run(["-f", "bestaudio/best", "-x", "--audio-format", "mp3",
-          "--no-playlist", "--no-warnings", "-o", template, url])
+    args = ["-f", "bestaudio/best", "--no-playlist", "--no-warnings", "-o", template, url]
+    if shutil.which("ffmpeg"):
+        # Ровный mp3 удобнее для повторных прогонов и меньше весит.
+        args = ["-x", "--audio-format", "mp3", *args]
+    # Без ffmpeg скачиваем дорожку как есть: faster-whisper декодирует m4a/webm
+    # сам (через PyAV), поэтому отдельный ffmpeg для распознавания не нужен.
+    _run(args)
     files = sorted(glob.glob(os.path.join(workdir, "audio.*")))
     if not files:
         raise MediaError("Аудио не скачалось")

@@ -189,7 +189,7 @@
 | `docs/DISTRIBUTION.md` | Сборка/подпись `.zxp` и раздача клиентам + выдача ключей |
 | `docs/MONETIZATION.md` | Тарифы и юнит-экономика |
 | `docs/CONTENT.md` | Сценарии роликов и постов для продвижения |
-| `docs/VIDEO_BRIEF.md` | Утилита `tools/videobrief`: ссылка на ролик → транскрипт → разбор |
+| `docs/VIDEO_BRIEF.md` | NP Brief (`tools/videobrief`): приложение для Mac — ссылка на ролик → разбор |
 | `docs/ROADMAP.md` | Этапы и статусы |
 | `backend/README.md` | Запуск бэкенда, таблица env, тесты |
 | `plugin/README.md` | Установка панели, устройство CEP-расширения |
@@ -214,7 +214,9 @@ cd backend && fly deploy --remote-only
 # Сборка подписанного плагина
 ZXPSIGNCMD=~/bin/ZXPSignCmd bash scripts/build-zxp.sh   # → dist/NP-SUB-<версия>.zxp
 
-# Разбор чужого ролика по ссылке (утилита вне продукта, см. docs/VIDEO_BRIEF.md)
-python -m tools.videobrief "https://..."                # → out/briefs/<ролик>/brief.md
-python tools/videobrief/tests/test_transcript.py        # её тесты (dep-free)
+# NP Brief — разбор чужого ролика (отдельная программа, см. docs/VIDEO_BRIEF.md)
+bash scripts/install-np-brief-mac.sh                    # → ~/Applications/NP Brief.app
+python -m tools.videobrief.webapp                       # то же окно без установки
+python -m tools.videobrief "https://..."                # то же из командной строки
+python tools/videobrief/tests/test_webapp.py            # её тесты (dep-free)
 ```

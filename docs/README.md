@@ -22,7 +22,7 @@
 | Выпустить релиз (панель / шлюз / воркер) | [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) |
 | Разобраться с тарифами и экономикой | [`MONETIZATION.md`](MONETIZATION.md) |
 | Снять ролик или написать пост про продукт | [`CONTENT.md`](CONTENT.md) |
-| Разобрать чужой виральный ролик по ссылке (транскрипт + сценарий) | [`VIDEO_BRIEF.md`](VIDEO_BRIEF.md) |
+| Разобрать чужой виральный ролик по ссылке (приложение NP Brief) | [`VIDEO_BRIEF.md`](VIDEO_BRIEF.md) |
 | Выбрать модель распознавания (мы, ISSAI, Yandex, CapCut) | [`ASR_PROVIDERS.md`](ASR_PROVIDERS.md) |
 | Посмотреть план развития (общий) | [`ROADMAP.md`](ROADMAP.md) |
 | Посмотреть детальные задачи по приоритетам | [`PROJECT.md`](PROJECT.md) + [`tasks/`](tasks/) |
@@ -31,7 +31,7 @@
 ## Документы по компонентам
 - [`../backend/README.md`](../backend/README.md) — запуск бэкенда, env-переменные, тесты.
 - [`../plugin/README.md`](../plugin/README.md) — устройство CEP-панели, установка.
-- [`VIDEO_BRIEF.md`](VIDEO_BRIEF.md) — утилита `tools/videobrief`: ссылка на ролик → разбор.
+- [`VIDEO_BRIEF.md`](VIDEO_BRIEF.md) — NP Brief (`tools/videobrief`): приложение для Mac, ссылка на ролик → разбор.
 
 ## Аудитории
 - **Разработчик / Claude Code:** `CLAUDE.md` → `ARCHITECTURE.md` → `DECISIONS.md`.

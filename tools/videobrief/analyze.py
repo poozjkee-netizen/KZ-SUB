@@ -14,7 +14,9 @@ class AnalyzeError(RuntimeError):
 
 
 def analyze(system: str, user: str, model: str, effort: str, max_tokens: int,
-            progress: bool = True) -> str:
+            progress: bool = True, api_key: str | None = None) -> str:
+    """Расшифровка -> разбор. api_key задаётся, когда ключ хранится в настройках
+    приложения, а не в переменных окружения (случай macOS-приложения)."""
     try:
         import anthropic
     except ImportError as exc:
@@ -24,7 +26,7 @@ def analyze(system: str, user: str, model: str, effort: str, max_tokens: int,
             "промпт, который можно вставить в чат вручную."
         ) from exc
 
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
     chunks: list[str] = []
     try:
         with client.messages.stream(
