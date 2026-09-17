@@ -40,3 +40,6 @@ dist/
 Thumbs.db
 .idea/
 .vscode/
+
+# Разборы роликов (tools/videobrief): чужой контент в репозиторий не кладём
+out/
