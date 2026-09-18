@@ -12,7 +12,8 @@ import shutil
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import asr, captions, media, prompt as prompt_mod, report, transcript as tr
+from . import (asr, captions, local_llm, longtext, media, prompt as prompt_mod,
+               report, transcript as tr)
 from .config import settings
 
 AUDIENCE_DEFAULT = "русскоязычная аудитория СНГ"
@@ -37,6 +38,11 @@ class Options:
     analyze: bool = True
     keep_work: bool = False
     api_key: str | None = None        # ключ из настроек приложения
+    engine: str = settings.engine     # auto | local | claude
+    local_url: str = settings.local_url
+    local_model: str = settings.local_model
+    local_ctx: int = settings.local_ctx
+    local_max_chars: int = settings.local_max_chars
 
 
 @dataclass
@@ -51,6 +57,7 @@ class Result:
     source_note: str
     brief_path: str | None = None
     analysis_error: str | None = None
+    engine_note: str = ""             # чем разобрано: модель и где она крутится
     files: dict = field(default_factory=dict)
 
 
@@ -193,21 +200,90 @@ def run(opts: Options, on_step: Step = _noop) -> Result:
     if not opts.analyze:
         return result
 
-    from .analyze import AnalyzeError, analyze  # импорт тут: без ключа тоже работаем
-
-    on_step("Разбираю ролик — это пара минут")
     try:
-        analysis = analyze(prompt_mod.SYSTEM, task, opts.model, opts.effort,
-                           opts.max_tokens, progress=False, api_key=opts.api_key)
-    except AnalyzeError as exc:
+        analysis, engine_note = analyze_text(opts, meta, timed, source_note, on_step)
+    except (local_llm.LocalLLMError, RuntimeError) as exc:
         result.analysis_error = str(exc)
         return result
 
+    result.engine_note = engine_note
     result.brief_path = os.path.join(out_dir, "brief.md")
-    brief = report.header(meta, source_note, opts.model) + analysis + "\n"
+    brief = report.header(meta, source_note, engine_note) + analysis + "\n"
     write(result.brief_path, brief)
     result.files["brief"] = brief
     return result
+
+
+def choose_engine(opts: Options) -> tuple[str, local_llm.Server | None]:
+    """Кем разбирать: локальной моделью или Claude. -> (движок, сервер или None).
+
+    "auto" сначала стучится в локальную модель: если она запущена, разбор идёт
+    на устройстве — без интернета, ключей и оплаты. Нет локальной — берём Claude,
+    но только если есть ключ, иначе честно говорим, чего не хватает.
+    """
+    if opts.engine == "claude":
+        return "claude", None
+    try:
+        server = local_llm.detect(opts.local_url)
+        return "local", server
+    except local_llm.LocalLLMError:
+        if opts.engine == "local":
+            raise
+        if not (opts.api_key or os.environ.get("ANTHROPIC_API_KEY")):
+            raise local_llm.LocalLLMError(
+                "Разбирать нечем: локальная модель не запущена, ключ Anthropic не задан. "
+                "Запусти Ollama (ollama serve) или добавь ключ в настройках. "
+                "Расшифровка при этом уже сохранена."
+            )
+        return "claude", None
+
+
+def analyze_local(opts: Options, server: local_llm.Server, meta: dict, timed: str,
+                  source_note: str, on_step: Step) -> tuple[str, str]:
+    """Разбор локальной моделью. Длинную расшифровку сначала сжимает по частям."""
+    model = local_llm.pick_model(server.models, opts.local_model)
+    if not model:
+        raise local_llm.LocalLLMError(
+            "На локальном сервере нет ни одной модели. Загрузи её "
+            "(например: ollama pull gemma3:12b) и повтори."
+        )
+
+    note = source_note
+    if longtext.needs_condensing(timed, opts.local_max_chars):
+        parts = longtext.split_lines(timed, opts.local_max_chars)
+        notes: list[str] = []
+        for index, part in enumerate(parts, 1):
+            on_step(f"Ролик длинный: сжимаю часть {index} из {len(parts)} ({model})")
+            notes.append(local_llm.chat(
+                server, model, prompt_mod.CONDENSE_SYSTEM,
+                prompt_mod.build_condense(part, index, len(parts)),
+                num_ctx=opts.local_ctx))
+        timed = "\n\n".join(notes)
+        note = f"{source_note}; длинный ролик сжат по частям"
+
+    task = prompt_mod.build(meta, timed, opts.audience, note)
+    on_step(f"Разбираю на устройстве: {model}")
+    text = local_llm.chat(server, model, prompt_mod.SYSTEM, task, num_ctx=opts.local_ctx)
+    return text, f"{model} (локально, {server.kind})"
+
+
+def analyze_text(opts: Options, meta: dict, timed: str, source_note: str,
+                 on_step: Step) -> tuple[str, str]:
+    """Отдаёт разбор и подпись «чем разобрано». Ошибки — понятным языком."""
+    engine, server = choose_engine(opts)
+    if engine == "local" and server is not None:
+        return analyze_local(opts, server, meta, timed, source_note, on_step)
+
+    from .analyze import AnalyzeError, analyze  # импорт тут: без ключа тоже работаем
+
+    on_step(f"Разбираю в облаке: {opts.model}")
+    try:
+        task = prompt_mod.build(meta, timed, opts.audience, source_note)
+        text = analyze(prompt_mod.SYSTEM, task, opts.model, opts.effort,
+                       opts.max_tokens, progress=False, api_key=opts.api_key)
+    except AnalyzeError as exc:
+        raise RuntimeError(str(exc)) from exc
+    return text, opts.model
 
 
 def write(path: str, content: str) -> None:

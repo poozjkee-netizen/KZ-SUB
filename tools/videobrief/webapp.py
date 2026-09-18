@@ -27,7 +27,7 @@ if __package__ in (None, ""):  # запуск файлом: python webapp.py
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     __package__ = "videobrief"
 
-from . import appconfig, media, pipeline  # noqa: E402
+from . import appconfig, local_llm, media, pipeline  # noqa: E402
 from .config import settings as env_settings  # noqa: E402
 
 UI_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui.html")
@@ -58,8 +58,12 @@ def _run_job(job: dict, values: dict) -> None:
         auto_subs=bool(values.get("auto_subs", True)),
         whisper=values.get("whisper") or env_settings.whisper_model,
         model=values.get("model") or env_settings.model,
-        analyze=bool(values.get("api_key")),
+        # Разбор доступен и без ключа: локальная модель работает на устройстве.
+        analyze=True,
         api_key=values.get("api_key") or None,
+        engine=values.get("engine") or env_settings.engine,
+        local_url=values.get("local_url") or env_settings.local_url,
+        local_model=values.get("local_model") or env_settings.local_model,
     )
     try:
         result = pipeline.run(opts, step)
@@ -77,12 +81,8 @@ def _run_job(job: dict, values: dict) -> None:
             "timed": result.files.get("timed", ""),
             "analysis_error": result.analysis_error,
             "analyzed": bool(result.brief_path),
+            "engine_note": result.engine_note,
         }
-        if not opts.analyze:
-            job["result"]["analysis_error"] = (
-                "Ключ Anthropic не задан — сделана только расшифровка. "
-                "Добавь ключ в настройках и нажми «Разобрать» ещё раз."
-            )
         step("Готово")
     finally:
         with _lock:
@@ -135,6 +135,15 @@ class Handler(BaseHTTPRequestHandler):
             with open(UI_PATH, "rb") as fh:
                 page = fh.read().replace(b"__TOKEN__", TOKEN.encode())
             self._send(200, page, "text/html; charset=utf-8")
+        elif parsed.path == "/api/local":
+            # Что сейчас запущено на устройстве: сервер и список моделей.
+            try:
+                server = local_llm.detect(appconfig.load().get("local_url", ""))
+            except local_llm.LocalLLMError as exc:
+                self._json({"error": str(exc)})
+            else:
+                self._json({"base": server.base, "kind": server.kind,
+                            "models": server.models})
         elif parsed.path == "/api/state":
             job_id = (query.get("job") or [""])[0]
             self._json({

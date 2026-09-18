@@ -217,6 +217,6 @@ ZXPSIGNCMD=~/bin/ZXPSignCmd bash scripts/build-zxp.sh   # → dist/NP-SUB-<ве�
 # NP Brief — разбор чужого ролика (отдельная программа, см. docs/VIDEO_BRIEF.md)
 bash scripts/install-np-brief-mac.sh                    # → ~/Applications/NP Brief.app
 python -m tools.videobrief.webapp                       # то же окно без установки
-python -m tools.videobrief "https://..."                # то же из командной строки
+python -m tools.videobrief "https://..." --engine local  # разбор на устройстве (Ollama)
 python tools/videobrief/tests/test_webapp.py            # её тесты (dep-free)
 ```

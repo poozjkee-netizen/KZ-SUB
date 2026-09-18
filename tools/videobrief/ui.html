@@ -93,7 +93,27 @@
 
   <div class="card settings" id="settings">
     <div class="field">
-      <label for="apiKey">Ключ Anthropic (нужен для разбора; расшифровка работает и без него)</label>
+      <label for="engine">Чем разбирать</label>
+      <select id="engine">
+        <option value="auto">Авто — локальная модель, если запущена</option>
+        <option value="local">Только локальная модель (без интернета)</option>
+        <option value="claude">Только Claude (по ключу)</option>
+      </select>
+    </div>
+    <div class="field" id="localRow">
+      <label for="localModel">Локальная модель (Ollama, LM Studio, llama.cpp)</label>
+      <div class="row">
+        <input type="text" id="localModel" placeholder="пусто = выбрать самой (ищет Gemma)">
+        <button id="findLocal">Найти</button>
+      </div>
+      <div class="hint" id="localInfo"></div>
+    </div>
+    <div class="field">
+      <label for="localUrl">Адрес локального сервера (обычно не нужен)</label>
+      <input type="text" id="localUrl" placeholder="пусто = поиск: 11434, 1234, 8080">
+    </div>
+    <div class="field">
+      <label for="apiKey">Ключ Anthropic (нужен только для разбора в облаке)</label>
       <input type="password" id="apiKey" placeholder="sk-ant-… — сохранится на этом маке" autocomplete="off">
     </div>
     <div class="field">
@@ -142,6 +162,7 @@
   <div class="card" id="result" style="display:none">
     <div class="row" style="align-items:center;margin-bottom:12px">
       <strong id="title"></strong>
+      <span class="badge" id="engineNote"></span>
       <div class="spacer"></div>
       <button id="copy">Скопировать</button>
       <button id="reveal">Показать в Finder</button>
@@ -163,7 +184,8 @@
 
 <script>
 var TOKEN = "__TOKEN__";
-var job = null, timer = null, data = {brief: "", clean: "", timed: ""}, tab = "brief", outDir = "";
+var job = null, timer = null, data = {brief: "", clean: "", timed: ""}, tab = "brief",
+    outDir = "", settings = {};
 
 function api(path, body) {
   var url = path + (path.indexOf("?") < 0 ? "?" : "&") + "t=" + encodeURIComponent(TOKEN);
@@ -265,6 +287,8 @@ function finish(res) {
   document.getElementById("go").disabled = false;
   document.getElementById("result").style.display = "block";
   document.getElementById("title").textContent = res.title || "Готово";
+  var note = document.getElementById("engineNote");
+  note.textContent = res.engine_note ? "разобрано: " + res.engine_note : "";
   outDir = res.out_dir;
   data = {brief: res.brief || "", clean: res.clean || "", timed: res.timed || ""};
   var warn = document.getElementById("warn");
@@ -351,6 +375,9 @@ document.getElementById("closeSettings").onclick = function () {
 
 document.getElementById("saveSettings").onclick = function () {
   api("/api/settings", {
+    engine: document.getElementById("engine").value,
+    local_model: document.getElementById("localModel").value.trim(),
+    local_url: document.getElementById("localUrl").value.trim(),
     api_key: document.getElementById("apiKey").value,
     audience: document.getElementById("audience").value,
     out_dir: document.getElementById("outDir").value,
@@ -363,17 +390,55 @@ document.getElementById("saveSettings").onclick = function () {
 };
 
 function applySettings(s) {
+  settings = s;
   document.getElementById("audience").value = s.audience || "";
   document.getElementById("outDir").value = s.out_dir || "";
   document.getElementById("whisper").value = s.whisper || "large-v3";
+  document.getElementById("engine").value = s.engine || "auto";
+  document.getElementById("localModel").value = s.local_model || "";
+  document.getElementById("localUrl").value = s.local_url || "";
   var badge = document.getElementById("keyBadge");
-  badge.textContent = s.api_key_set ? "ключ " + s.api_key_hint : "ключ не задан";
-  badge.className = "badge" + (s.api_key_set ? "" : " err");
-  if (!s.api_key_set) {
-    document.getElementById("hint").innerHTML =
-      "Без ключа Anthropic будет только расшифровка. Добавь ключ в настройках (⚙︎).";
+  if (s.engine === "claude") {
+    badge.textContent = s.api_key_set ? "облако · ключ " + s.api_key_hint : "ключ не задан";
+    badge.className = "badge" + (s.api_key_set ? "" : " err");
+  } else {
+    badge.textContent = s.local_model ? "локально · " + s.local_model : "локальная модель";
+    badge.className = "badge";
   }
+  document.getElementById("hint").textContent =
+    "Ролик может быть на любом языке — разбор всегда на русском.";
 }
+
+// Что сейчас запущено на устройстве. Кнопка «Найти» — чтобы не гадать, как
+// называется модель: имена у Ollama вида «gemma3:12b», их проще выбрать из списка.
+document.getElementById("findLocal").onclick = function () {
+  var info = document.getElementById("localInfo");
+  info.className = "hint";
+  info.textContent = "Ищу…";
+  api("/api/local").then(function (r) {
+    if (r.error) {
+      info.className = "hint err";
+      info.textContent = r.error;
+      return;
+    }
+    if (!r.models.length) {
+      info.className = "hint err";
+      info.textContent = "Сервер " + r.kind + " отвечает (" + r.base + "), но моделей нет.";
+      return;
+    }
+    info.className = "hint";
+    info.innerHTML = "Нашёл " + r.kind + " на " + r.base + ": " +
+      r.models.map(function (m) {
+        return "<a href='#' data-m='" + m + "'>" + m + "</a>";
+      }).join(" · ");
+    info.querySelectorAll("a").forEach(function (a) {
+      a.onclick = function (e) {
+        e.preventDefault();
+        document.getElementById("localModel").value = a.dataset.m;
+      };
+    });
+  });
+};
 
 document.getElementById("quit").onclick = function (e) {
   e.preventDefault();

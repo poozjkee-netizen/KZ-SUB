@@ -80,6 +80,16 @@ chmod +x "$APP_DIR/Contents/MacOS/np-brief"
 say ""
 say "Готово. NP Brief лежит в ~/Applications."
 echo "Открой его двойным кликом — откроется окно в браузере."
-echo "Первым делом нажми ⚙︎ и вставь ключ Anthropic — без него будет только расшифровка."
+echo ""
+if command -v ollama >/dev/null 2>&1; then
+  echo "Ollama на месте — разбор пойдёт на твоём маке, без интернета и ключей."
+  echo "Модели, которые у тебя есть:"
+  ollama list 2>/dev/null | sed -n '2,6p' | awk '{print "    " $1}'
+  echo "Если Ollama не запущена, подними её:  ollama serve"
+else
+  echo "Разбор можно делать двумя способами (выбирается в окне, ⚙︎):"
+  echo "  • на устройстве — Ollama / LM Studio / llama.cpp с локальной моделью;"
+  echo "  • в облаке — ключ Anthropic."
+fi
 echo ""
 echo "Открыть сейчас:  open \"$APP_DIR\""

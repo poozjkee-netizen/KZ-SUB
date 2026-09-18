@@ -39,7 +39,16 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
                    help="готовая расшифровка (.vtt/.srt/.txt) — пропустить скачивание")
     p.add_argument("--lang", default=None,
                    help="язык речи для распознавания (по умолчанию — авто-детект)")
-    p.add_argument("--model", default=settings.model, help="модель разбора")
+    p.add_argument("--engine", choices=("auto", "local", "claude"),
+                   default=settings.engine,
+                   help="чем разбирать: auto (сначала локальная модель), "
+                        "local (только на устройстве), claude (по ключу)")
+    p.add_argument("--local-url", default=settings.local_url,
+                   help="адрес локального сервера моделей "
+                        "(пусто — поиск: Ollama 11434, LM Studio 1234, llama.cpp 8080)")
+    p.add_argument("--local-model", default=settings.local_model,
+                   help="локальная модель; хватит куска имени: gemma")
+    p.add_argument("--model", default=settings.model, help="облачная модель разбора")
     p.add_argument("--effort", default=settings.effort,
                    help="глубина разбора: low|medium|high|xhigh|max")
     p.add_argument("--max-tokens", type=int, default=settings.max_tokens,
@@ -65,7 +74,8 @@ def main(argv: list[str] | None = None) -> int:
         lang=args.lang, model=args.model, effort=args.effort,
         max_tokens=args.max_tokens, whisper=args.whisper, device=args.device,
         compute_type=args.compute_type, analyze=not args.no_analysis,
-        keep_work=args.keep_audio,
+        keep_work=args.keep_audio, engine=args.engine,
+        local_url=args.local_url, local_model=args.local_model,
     )
 
     def step(message: str) -> None:

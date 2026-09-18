@@ -15,6 +15,9 @@ import sys
 APP_NAME = "NP Brief"
 
 DEFAULTS: dict = {
+    "engine": "auto",       # auto | local | claude (см. config.py)
+    "local_url": "",        # адрес локального сервера моделей; пусто = поиск сам
+    "local_model": "",      # имя локальной модели; пусто = выбрать самой
     "api_key": "",
     "audience": "русскоязычная аудитория СНГ",
     "out_dir": "",          # пусто = ~/Movies/NP Brief
