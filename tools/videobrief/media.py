@@ -114,6 +114,9 @@ def fetch_subtitles(url: str, lang: str, is_auto: bool, workdir: str) -> str:
     template = os.path.join(workdir, "subs.%(ext)s")
     _run([
         "--skip-download", "--no-playlist", "--no-warnings",
+        # Площадки любят отвечать 429 на выдачу субтитров. Пара повторов
+        # снимает случайный отказ; на настойчивый — выше есть запасной путь.
+        "--retries", "3",
         "--write-auto-subs" if is_auto else "--write-subs",
         "--sub-langs", lang, "--sub-format", "vtt/srt/best",
         "-o", template, url,

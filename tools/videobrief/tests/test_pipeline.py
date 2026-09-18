@@ -8,7 +8,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 
-from videobrief import prompt as prompt_mod  # noqa: E402
+import shutil  # noqa: E402
+import tempfile  # noqa: E402
+
+from videobrief import asr, media, pipeline, prompt as prompt_mod  # noqa: E402
+from videobrief.transcript import Segment  # noqa: E402
 from videobrief.media import meta_from_info, pick_subtitle_track  # noqa: E402
 from videobrief.report import folder_name, header, slugify  # noqa: E402
 
@@ -96,6 +100,60 @@ def test_header_lists_source():
     assert "**Длительность:** 01:35" in out
     assert "claude-opus-5" in out
     assert "Автор" not in out  # пустое поле не печатаем
+
+
+def test_subtitle_failure_falls_back_to_speech():
+    """Площадка ответила 429 на субтитры — прогон идёт дальше через звук.
+
+    Это поведение появилось после живого случая: YouTube ограничил выдачу
+    субтитров, и разбор падал целиком, хотя аудио скачать было можно.
+    """
+    work = tempfile.mkdtemp(prefix="npbrief-429-")
+    original = (media.probe, media.fetch_subtitles, media.fetch_audio, asr.transcribe)
+    try:
+        media.probe = lambda url: {"title": "Ролик", "id": "abc",
+                                   "automatic_captions": {"en": [{}]}}
+        def refuse(*args, **kwargs):
+            raise media.MediaError(
+                "yt-dlp не смог обработать ссылку: HTTP Error 429: Too Many Requests")
+        media.fetch_subtitles = refuse
+        media.fetch_audio = lambda url, workdir: os.path.join(workdir, "audio.mp3")
+        asr.transcribe = lambda *a, **k: ([Segment(0.0, 2.0, "распознанный текст")], "en")
+
+        steps = []
+        opts = pipeline.Options(source="https://youtu.be/abc", out_root=work,
+                                analyze=False)
+        result = pipeline.run(opts, steps.append)
+
+        assert "Whisper" in result.source_note
+        assert any("ограничила запросы" in s for s in steps), steps
+        with open(result.transcript_path, encoding="utf-8") as fh:
+            assert "распознанный текст" in fh.read()
+    finally:
+        media.probe, media.fetch_subtitles, media.fetch_audio, asr.transcribe = original
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def test_subs_only_mode_still_fails_loudly():
+    """В режиме «только субтитры» отказ площадки — именно отказ, без подмены."""
+    work = tempfile.mkdtemp(prefix="npbrief-429-")
+    original = (media.probe, media.fetch_subtitles)
+    try:
+        media.probe = lambda url: {"title": "Ролик", "subtitles": {"en": [{}]}}
+        def refuse(*args, **kwargs):
+            raise media.MediaError("HTTP Error 429: Too Many Requests")
+        media.fetch_subtitles = refuse
+        opts = pipeline.Options(source="https://youtu.be/abc", out_root=work,
+                                mode="subs", analyze=False)
+        try:
+            pipeline.run(opts)
+        except media.MediaError as exc:
+            assert "429" in str(exc)
+        else:
+            raise AssertionError("режим «только субтитры» промолчал об отказе")
+    finally:
+        media.probe, media.fetch_subtitles = original
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def run():

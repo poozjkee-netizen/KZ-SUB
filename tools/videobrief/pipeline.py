@@ -68,6 +68,14 @@ def _noop(_: str) -> None:
     pass
 
 
+def _short(exc: Exception, limit: int = 60) -> str:
+    """Короткая причина отказа для строки статуса — без простыни из stderr."""
+    text = " ".join(str(exc).split())
+    if "429" in text:
+        return "площадка ограничила запросы"
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
 def _fill(meta: dict, key: str, value) -> None:
     """Проставляет поле, если его нет ИЛИ оно пустое.
 
@@ -122,12 +130,21 @@ def collect(opts: Options, workdir: str,
                 lang, is_auto = track
                 kind = "авто-субтитры" if is_auto else "субтитры автора"
                 on_step(f"Беру {kind} ({lang}) — это быстро")
-                segments = captions.parse(
-                    media.fetch_subtitles(opts.source, lang, is_auto, workdir))
-                if segments:
-                    _fill(meta, "language", lang.split("-")[0])
-                    return segments, meta, f"{kind} ролика, язык {lang}", is_auto
-                on_step("Субтитры пустые — распознаю звук")
+                # Площадка может не отдать субтитры (429 «слишком много
+                # запросов», приватный ролик, сломанная дорожка). Это не повод
+                # ронять прогон: звук у нас уже есть откуда взять.
+                try:
+                    segments = captions.parse(
+                        media.fetch_subtitles(opts.source, lang, is_auto, workdir))
+                except media.MediaError as exc:
+                    if opts.mode == "subs":
+                        raise
+                    on_step(f"Субтитры не отдались ({_short(exc)}) — распознаю звук")
+                else:
+                    if segments:
+                        _fill(meta, "language", lang.split("-")[0])
+                        return segments, meta, f"{kind} ролика, язык {lang}", is_auto
+                    on_step("Субтитры пустые — распознаю звук")
             elif opts.mode == "subs":
                 raise media.MediaError(
                     "У ролика нет готовых субтитров, а режим «только субтитры» "
