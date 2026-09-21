@@ -16,6 +16,7 @@ import secrets
 import subprocess
 import sys
 import threading
+import time
 import uuid
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -38,6 +39,7 @@ _current: str | None = None
 def _run_job(job: dict) -> None:
     """Прогон в фоне. Шаги копятся в job['steps'] — окно их опрашивает."""
     global _current
+    started = time.monotonic()
     try:
         result = pipeline.run(pipeline.Options(source=job["url"]), job["steps"].append)
     except (media.MediaError, RuntimeError, OSError) as exc:
@@ -53,8 +55,9 @@ def _run_job(job: dict) -> None:
             "timed": result.files.get("timed", ""),
             "analysis_error": result.analysis_error,
             "model_note": result.model_note,
+            # Сколько заняло — единственная цифра, которую человек не знает сам.
+            "elapsed": int(time.monotonic() - started),
         }
-        job["steps"].append("Готово")
     finally:
         with _lock:
             _current = None

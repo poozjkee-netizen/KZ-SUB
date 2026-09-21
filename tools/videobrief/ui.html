@@ -5,160 +5,372 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NP Brief</title>
 <style>
+  /* Палитра: чернила и бумага. Акцент ровно один и только на действии —
+     так интерфейс читается спокойно, а кнопка не спорит с текстом. */
   :root {
-    --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; --muted: #6e6e73;
-    --line: #e3e3e6; --accent: #0071e3; --accent-text: #ffffff;
-    --err: #c4362c; --code: #f2f2f5;
+    --paper: #fbfbfd;
+    --surface: #ffffff;
+    --surface-2: #f4f4f7;
+    --ink: #101014;
+    --ink-2: #5b5b66;
+    --ink-3: #8a8a96;
+    --hairline: #e6e6ec;
+    --accent: #101014;          /* кнопка действия: чернила на бумаге */
+    --accent-ink: #ffffff;
+    --focus: #2f6df6;
+    --danger: #c0362c;
+    --shadow: 0 1px 2px rgba(16, 16, 20, .04), 0 8px 24px rgba(16, 16, 20, .06);
+    --radius: 14px;
+    --ease: cubic-bezier(.2, .6, .2, 1);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #1c1c1e; --card: #262629; --text: #f2f2f7; --muted: #9a9aa0;
-      --line: #3a3a3d; --accent: #0a84ff; --accent-text: #ffffff;
-      --err: #ff6b5e; --code: #1f1f22;
+      --paper: #0e0e11;
+      --surface: #17171b;
+      --surface-2: #1f1f25;
+      --ink: #f4f4f7;
+      --ink-2: #a3a3ae;
+      --ink-3: #74747f;
+      --hairline: #2a2a31;
+      --accent: #f4f4f7;
+      --accent-ink: #101014;
+      --focus: #6f9bff;
+      --danger: #ff7a6e;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px rgba(0, 0, 0, .28);
     }
   }
+
   * { box-sizing: border-box; }
+  /* Атрибут hidden обязан побеждать display из классов — иначе пустые плашки
+     показываются поверх скрытых. */
+  [hidden] { display: none !important; }
+  html { -webkit-font-smoothing: antialiased; }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    padding: 28px 16px 56px;
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter",
+          system-ui, sans-serif;
+    font-feature-settings: "cv05" 1, "ss01" 1;
+    letter-spacing: -0.006em;
+    padding: 40px 24px 80px;
   }
-  .wrap { max-width: 880px; margin: 0 auto; }
-  header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-  header h1 { font-size: 20px; margin: 0; letter-spacing: -0.2px; }
-  header .sub { color: var(--muted); font-size: 13px; }
-  .spacer { flex: 1; }
-  .card {
-    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-    padding: 18px; margin-bottom: 16px;
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  /* --- шапка --- */
+  .top { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 32px; }
+  .brand h1 {
+    margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.02em;
   }
-  .row { display: flex; gap: 10px; }
+  .brand p { margin: 3px 0 0; font-size: 13px; color: var(--ink-3); }
+  .grow { flex: 1; }
+
+  /* --- элементы управления --- */
+  button, input, select {
+    font: inherit; color: inherit; letter-spacing: inherit;
+  }
+  button { cursor: pointer; border: 0; background: none; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    height: 44px; padding: 0 20px; border-radius: 11px;
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid transparent;
+    font-size: 14.5px; font-weight: 500;
+    transition: background .18s var(--ease), transform .12s var(--ease),
+                opacity .18s var(--ease);
+  }
+  .btn:hover { background: var(--hairline); }
+  .btn:active { transform: scale(.985); }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); min-width: 130px; }
+  .btn-primary:hover { background: var(--accent); opacity: .88; }
+  .btn-quiet {
+    height: 36px; padding: 0 13px; font-size: 13.5px; background: transparent;
+    border: 1px solid var(--hairline); color: var(--ink-2);
+  }
+  .btn-quiet:hover { background: var(--surface-2); color: var(--ink); }
+  .btn-icon {
+    width: 38px; height: 38px; padding: 0; border-radius: 10px;
+    background: transparent; border: 1px solid var(--hairline); color: var(--ink-2);
+  }
+  .btn-icon:hover { background: var(--surface-2); color: var(--ink); }
+  .btn:disabled { opacity: .45; cursor: default; transform: none; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
   input[type=text], select {
-    width: 100%; padding: 11px 13px; font-size: 15px; color: var(--text);
-    background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
-    font-family: inherit;
+    width: 100%; height: 44px; padding: 0 14px;
+    background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: 11px; font-size: 14.5px;
+    transition: border-color .18s var(--ease), box-shadow .18s var(--ease);
   }
-  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-  button {
-    font: inherit; font-weight: 500; padding: 11px 18px; border-radius: 10px;
-    border: 1px solid var(--line); background: var(--card); color: var(--text);
-    cursor: pointer; white-space: nowrap;
+  input[type=text]::placeholder { color: var(--ink-3); }
+  input[type=text]:focus, select:focus {
+    outline: none; border-color: var(--ink-3);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus) 14%, transparent);
   }
-  button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; }
-  button:disabled { opacity: .5; cursor: default; }
-  button.icon { padding: 9px 12px; }
-  .hint { color: var(--muted); font-size: 13px; margin-top: 10px; }
+  select { appearance: none; padding-right: 36px;
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%238a8a96' stroke-width='1.6'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 14px center; }
+
+  /* --- карточки --- */
+  .card {
+    background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 20px; margin-bottom: 18px;
+  }
+  .ask { display: flex; gap: 10px; }
+  .ask input { height: 48px; font-size: 15px; }
+  .ask .btn-primary { height: 48px; }
+
+  /* --- ход работы --- */
   .steps { list-style: none; margin: 0; padding: 0; }
-  .steps li { padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
-  .steps li:last-child { border-bottom: 0; }
-  .steps li.now { color: var(--accent); }
-  .steps li.err { color: var(--err); }
-  .spin { display: inline-block; width: 13px; height: 13px; margin-right: 8px;
-          border: 2px solid var(--line); border-top-color: var(--accent);
-          border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
+  .steps li {
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 0; font-size: 14px; color: var(--ink-2);
+    animation: rise .24s var(--ease) both;
+  }
+  .steps li + li { border-top: 1px solid var(--hairline); }
+  .steps li.now { color: var(--ink); font-weight: 500; }
+  .steps li.fail { color: var(--danger); }
+  .mark { flex: none; width: 16px; height: 16px; color: var(--ink-3); }
+  .now .mark { color: var(--ink); }
+  .fail .mark { color: var(--danger); }
+  .spin { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
-  .tabs button { padding: 7px 14px; font-size: 14px; border-radius: 999px; }
-  .tabs button.on { background: var(--accent); color: var(--accent-text); border-color: transparent; }
-  .out h2 { font-size: 18px; margin: 22px 0 8px; }
-  .out h3 { font-size: 15px; margin: 18px 0 6px; }
-  .out table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
-  .out th, .out td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
-  .out th { background: var(--code); }
-  .plain { white-space: pre-wrap; font-size: 14px; line-height: 1.65; }
-  .settings { display: none; }
-  .settings.open { display: block; }
-  .field { margin-bottom: 14px; }
-  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
-  .muted { color: var(--muted); }
-  .err { color: var(--err); }
-  .badge { font-size: 12px; color: var(--muted); border: 1px solid var(--line);
-           border-radius: 999px; padding: 3px 9px; max-width: 320px;
-           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .models a { color: var(--accent); text-decoration: none; }
-  .models a:hover { text-decoration: underline; }
+  @keyframes rise { from { opacity: 0; transform: translateY(4px); } }
+
+  /* --- результат --- */
+  .result-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 4px; }
+  .result-head h2 {
+    margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.022em;
+    line-height: 1.3;
+  }
+  .meta {
+    margin: 6px 0 18px; font-size: 12.5px; color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .meta span + span::before { content: "·"; margin: 0 7px; }
+  .actions { display: flex; gap: 8px; flex: none; }
+
+  .segmented {
+    display: inline-flex; gap: 2px; padding: 3px; margin-bottom: 20px;
+    background: var(--surface-2); border-radius: 10px;
+  }
+  .segmented button {
+    height: 30px; padding: 0 14px; border-radius: 8px;
+    font-size: 13.5px; font-weight: 500; color: var(--ink-2);
+    transition: background .18s var(--ease), color .18s var(--ease);
+  }
+  .segmented button:hover { color: var(--ink); }
+  .segmented button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+  .note {
+    display: flex; gap: 9px; padding: 12px 14px; margin-bottom: 18px;
+    background: color-mix(in srgb, var(--danger) 9%, transparent);
+    border-radius: 10px; font-size: 13.5px; color: var(--danger);
+  }
+  .note svg { flex: none; margin-top: 2px; }
+
+  /* --- текст разбора --- */
+  .doc { max-width: 68ch; }
+  .doc h2 {
+    font-size: 16px; font-weight: 600; letter-spacing: -0.015em;
+    margin: 30px 0 10px; padding-top: 22px; border-top: 1px solid var(--hairline);
+  }
+  .doc h2:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+  .doc h3 { font-size: 14.5px; font-weight: 600; margin: 20px 0 6px; }
+  .doc p, .doc li { font-size: 14.5px; line-height: 1.68; color: var(--ink); }
+  .doc ul, .doc ol { padding-left: 20px; }
+  .doc li { margin: 4px 0; }
+  .doc strong { font-weight: 600; }
+  .doc code {
+    font: 13px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
+    background: var(--surface-2); padding: 1px 5px; border-radius: 5px;
+  }
+  .doc table {
+    width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .doc th {
+    text-align: left; font-weight: 500; color: var(--ink-3);
+    font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase;
+    padding: 0 12px 8px 0; border-bottom: 1px solid var(--hairline);
+  }
+  .doc td {
+    padding: 10px 12px 10px 0; border-bottom: 1px solid var(--hairline);
+    vertical-align: top; line-height: 1.5;
+  }
+  .doc tr:last-child td { border-bottom: 0; }
+  .plain {
+    max-width: 68ch; white-space: pre-wrap; font-size: 14.5px; line-height: 1.75;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- настройки --- */
+  .sheet {
+    position: fixed; inset: 0; display: none; align-items: flex-start;
+    justify-content: center; padding: 64px 24px; z-index: 10;
+    background: color-mix(in srgb, var(--paper) 62%, transparent);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  }
+  .sheet.open { display: flex; animation: fade .18s var(--ease); }
+  @keyframes fade { from { opacity: 0; } }
+  .sheet .card {
+    width: 100%; max-width: 520px; margin: 0; padding: 24px;
+    animation: pop .22s var(--ease);
+    max-height: 100%; overflow: auto;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(-8px) scale(.99); } }
+  .sheet h2 { margin: 0 0 20px; font-size: 16px; font-weight: 600; letter-spacing: -0.015em; }
+  .field { margin-bottom: 18px; }
+  .field > label {
+    display: block; font-size: 12.5px; font-weight: 500; color: var(--ink-2);
+    margin-bottom: 7px;
+  }
+  .field .help { margin-top: 7px; font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .chip {
+    padding: 5px 11px; border-radius: 8px; font-size: 12.5px;
+    background: var(--surface-2); color: var(--ink-2);
+    transition: background .18s var(--ease), color .18s var(--ease);
+  }
+  .chip:hover, .chip.on { background: var(--ink); color: var(--paper); }
+  .sheet-actions { display: flex; gap: 8px; margin-top: 24px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+  @media (max-width: 560px) {
+    body { padding: 24px 16px 60px; }
+    .ask { flex-direction: column; }
+    .result-head { flex-direction: column; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <header>
-    <div>
+  <div class="top">
+    <div class="brand">
       <h1>NP Brief</h1>
-      <div class="sub">ссылка на ролик → расшифровка → разбор и свой сценарий</div>
+      <p>Ссылка на ролик — расшифровка, разбор и свой сценарий</p>
     </div>
-    <div class="spacer"></div>
-    <span id="modelBadge" class="badge"></span>
-    <button class="icon" id="gear" title="Настройки">⚙︎</button>
-  </header>
-
-  <div class="card settings" id="settings">
-    <div class="field">
-      <label for="modelPath">Модель для разбора (файл .gguf на этом маке)</label>
-      <input type="text" id="modelPath" placeholder="пусто = выбрать самой">
-      <div class="hint models" id="modelList">Ищу модели…</div>
-    </div>
-    <div class="field">
-      <label for="audience">Под кого делаем свою версию</label>
-      <input type="text" id="audience">
-    </div>
-    <div class="field">
-      <label for="outDir">Куда складывать разборы</label>
-      <input type="text" id="outDir">
-    </div>
-    <div class="field">
-      <label for="whisper">Распознавание речи, если у ролика нет субтитров</label>
-      <select id="whisper">
-        <option value="large-v3">large-v3 — точнее, но дольше</option>
-        <option value="medium">medium — быстрее</option>
-        <option value="small">small — совсем быстро, грубее</option>
-      </select>
-    </div>
-    <div class="row">
-      <button class="primary" id="saveSettings">Сохранить</button>
-      <button id="closeSettings">Закрыть</button>
-    </div>
+    <div class="grow"></div>
+    <button class="btn-icon" id="gear" title="Настройки" aria-label="Настройки">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
   </div>
 
   <div class="card">
-    <div class="row">
-      <input type="text" id="url" placeholder="Вставь ссылку: YouTube, Instagram, TikTok…" autofocus>
-      <button class="primary" id="go">Разобрать</button>
+    <div class="ask">
+      <input type="text" id="url" placeholder="Вставь ссылку на ролик" autofocus
+             spellcheck="false" autocomplete="off">
+      <button class="btn btn-primary" id="go">Разобрать</button>
     </div>
-    <div class="hint">Ролик может быть на любом языке — разбор всегда на русском.
-      Всё считается на этом маке, без интернета для разбора.</div>
   </div>
 
-  <div class="card" id="progress" style="display:none">
+  <div class="card" id="progress" hidden>
     <ul class="steps" id="steps"></ul>
   </div>
 
-  <div class="card" id="result" style="display:none">
-    <div class="row" style="align-items:center;margin-bottom:12px">
-      <strong id="title"></strong>
-      <span class="badge" id="modelNote"></span>
-      <div class="spacer"></div>
-      <button id="copy">Скопировать</button>
-      <button id="reveal">Показать в Finder</button>
+  <div class="card" id="result" hidden>
+    <div class="result-head">
+      <div style="min-width:0">
+        <h2 id="title"></h2>
+        <div class="meta" id="meta"></div>
+      </div>
+      <div class="grow"></div>
+      <div class="actions">
+        <button class="btn btn-quiet" id="copy">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="12" height="12" rx="2.5"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          <span id="copyLabel">Копировать</span>
+        </button>
+        <button class="btn btn-quiet" id="reveal">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          </svg>
+          В Finder
+        </button>
+      </div>
     </div>
-    <div id="warn" class="hint err" style="display:none"></div>
-    <div class="tabs" id="tabs">
-      <button data-tab="brief" class="on">Разбор</button>
-      <button data-tab="clean">Чистый текст</button>
-      <button data-tab="timed">С тайм-кодами</button>
-    </div>
-    <div class="out" id="out"></div>
-  </div>
 
-  <div class="hint" style="text-align:center">
-    Разборы лежат в папке из настроек · <a href="#" id="quit">закрыть программу</a>
+    <div class="note" id="note" hidden>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round">
+        <circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/>
+      </svg>
+      <span id="noteText"></span>
+    </div>
+
+    <div class="segmented" id="tabs">
+      <button data-tab="brief" class="on">Разбор</button>
+      <button data-tab="clean">Текст</button>
+      <button data-tab="timed">Тайм-коды</button>
+    </div>
+    <div id="out" class="doc"></div>
   </div>
 
 </div>
 
+<div class="sheet" id="sheet">
+  <div class="card">
+    <h2>Настройки</h2>
+
+    <div class="field">
+      <label for="modelPath">Модель для разбора</label>
+      <input type="text" id="modelPath" placeholder="Выбрать автоматически"
+             spellcheck="false" autocomplete="off">
+      <div class="help" id="modelHelp">Ищу модели на этом маке…</div>
+      <div class="chips" id="modelChips"></div>
+    </div>
+
+    <div class="field">
+      <label for="audience">Аудитория своей версии</label>
+      <input type="text" id="audience" spellcheck="false">
+      <div class="help">Под кого модель адаптирует сценарий.</div>
+    </div>
+
+    <div class="field">
+      <label for="outDir">Папка для разборов</label>
+      <input type="text" id="outDir" spellcheck="false" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label for="whisper">Распознавание речи</label>
+      <select id="whisper">
+        <option value="large-v3">Точное — large-v3</option>
+        <option value="medium">Быстрее — medium</option>
+        <option value="small">Самое быстрое — small</option>
+      </select>
+      <div class="help">Работает, только если у ролика нет готовых субтитров.</div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-primary" id="saveSettings">Сохранить</button>
+      <button class="btn" id="closeSettings">Отмена</button>
+      <div class="grow"></div>
+      <button class="btn btn-quiet" id="quit">Закрыть программу</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var TOKEN = "__TOKEN__";
-var job = null, timer = null, data = {brief: "", clean: "", timed: ""}, tab = "brief", outDir = "";
+var job = null, timer = null, current = {}, tab = "brief", outDir = "";
+
+var ICON = {
+  done: "<svg class='mark' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>",
+  busy: "<svg class='mark spin' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'><path d='M12 3a9 9 0 1 0 9 9' /></svg>",
+  fail: "<svg class='mark' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'><path d='M18 6 6 18M6 6l12 12'/></svg>"
+};
 
 function api(path, body) {
   var url = path + (path.indexOf("?") < 0 ? "?" : "&") + "t=" + encodeURIComponent(TOKEN);
@@ -171,9 +383,8 @@ function esc(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Маленький разметчик Markdown: заголовки, таблицы, списки, жирный/курсив.
-// Своими руками, потому что внешние библиотеки тянуть неоткуда — программа
-// работает без интернета.
+// Разметчик Markdown: заголовки, таблицы, списки, выделения. Своими руками —
+// программа работает без интернета, внешние библиотеки тянуть неоткуда.
 function md(src) {
   var lines = esc(src).split("\n"), html = [], i = 0;
   function inline(t) {
@@ -227,50 +438,72 @@ function md(src) {
 function render() {
   var box = document.getElementById("out");
   if (tab === "brief") {
-    box.className = "out";
-    box.innerHTML = data.brief ? md(data.brief) : "<p class='muted'>Разбора нет.</p>";
+    box.className = "doc";
+    box.innerHTML = current.brief ? md(current.brief) : "";
   } else {
     box.className = "plain";
-    box.textContent = data[tab] || "—";
+    box.textContent = current[tab] || "";
   }
 }
 
-function showSteps(steps, running, failed) {
-  document.getElementById("progress").style.display = "block";
+// Ход работы: последний шаг живой, прошлые — галочками. Иконки, а не символы:
+// «✓» в строке выглядит как текст, а не как состояние.
+function showSteps(steps, state) {
+  var box = document.getElementById("progress");
+  box.hidden = false;
   var list = document.getElementById("steps");
   list.innerHTML = "";
-  steps.forEach(function (s, idx) {
-    var li = document.createElement("li");
+  steps.forEach(function (text, idx) {
     var last = idx === steps.length - 1;
-    if (last && running) {
-      li.className = "now";
-      li.innerHTML = "<span class='spin'></span>" + esc(s);
-    } else {
-      li.textContent = (last && failed ? "" : "✓ ") + s;
-      if (last && failed) { li.className = "err"; }
-    }
+    var li = document.createElement("li");
+    var icon = ICON.done, cls = "";
+    if (last && state === "running") { icon = ICON.busy; cls = "now"; }
+    if (last && state === "failed") { icon = ICON.fail; cls = "fail"; }
+    li.className = cls;
+    li.innerHTML = icon + "<span>" + esc(text) + "</span>";
     list.appendChild(li);
   });
 }
 
+function setBusy(on) {
+  var btn = document.getElementById("go");
+  btn.disabled = on;
+  btn.textContent = on ? "Разбираю…" : "Разобрать";
+}
+
+// Под заголовком — только то, чего человек не видит сам: чем разобрано.
+// Путь к папке, ключи и адреса тут не нужны — для этого есть кнопка «В Finder».
 function finish(res) {
-  document.getElementById("go").disabled = false;
-  document.getElementById("result").style.display = "block";
-  document.getElementById("title").textContent = res.title || "Готово";
-  document.getElementById("modelNote").textContent = res.model_note || "";
+  setBusy(false);
+  document.getElementById("result").hidden = false;
+  document.getElementById("title").textContent = res.title || "Разбор готов";
+  var bits = [];
+  if (res.model_note) { bits.push(res.model_note); }
+  if (res.elapsed) { bits.push(humanTime(res.elapsed)); }
+  document.getElementById("meta").innerHTML =
+    bits.map(function (b) { return "<span>" + esc(b) + "</span>"; }).join("");
   outDir = res.out_dir;
-  data = {brief: res.brief || "", clean: res.clean || "", timed: res.timed || ""};
-  var warn = document.getElementById("warn");
+  current = {brief: res.brief || "", clean: res.clean || "", timed: res.timed || ""};
+
+  var note = document.getElementById("note");
+  note.hidden = !res.analysis_error;
   if (res.analysis_error) {
-    warn.style.display = "block";
-    warn.textContent = res.analysis_error;
-    tab = "clean";
-  } else {
-    warn.style.display = "none";
-    tab = "brief";
+    document.getElementById("noteText").textContent = res.analysis_error;
   }
+  selectTab(res.brief ? "brief" : "clean");
+}
+
+// «73» ни о чём не говорит, «1 мин 13 с» — говорит.
+function humanTime(seconds) {
+  if (seconds < 60) { return seconds + " с"; }
+  var m = Math.floor(seconds / 60), s = seconds % 60;
+  return m + " мин" + (s ? " " + s + " с" : "");
+}
+
+function selectTab(name) {
+  tab = name;
   document.querySelectorAll("#tabs button").forEach(function (b) {
-    b.className = b.dataset.tab === tab ? "on" : "";
+    b.className = b.dataset.tab === name ? "on" : "";
   });
   render();
 }
@@ -279,31 +512,33 @@ function poll() {
   api("/api/state?job=" + encodeURIComponent(job)).then(function (state) {
     var j = state.job;
     if (!j) { return; }
-    if (j.status === "running") { showSteps(j.steps, true, false); return; }
+    if (j.status === "running") { showSteps(j.steps, "running"); return; }
     clearInterval(timer); timer = null;
     if (j.status === "error") {
-      document.getElementById("go").disabled = false;
-      showSteps(j.steps.concat(["Ошибка: " + j.error]), false, true);
+      setBusy(false);
+      showSteps(j.steps.concat([j.error]), "failed");
     } else {
-      showSteps(j.steps, false, false);
+      // Список шагов сделал своё дело: дальше на экране только результат.
+      document.getElementById("progress").hidden = true;
       finish(j.result);
     }
   });
 }
 
 document.getElementById("go").onclick = function () {
-  var url = document.getElementById("url").value.trim();
-  if (!url) { document.getElementById("url").focus(); return; }
-  this.disabled = true;
-  document.getElementById("result").style.display = "none";
+  var field = document.getElementById("url");
+  var url = field.value.trim();
+  if (!url) { field.focus(); return; }
+  setBusy(true);
+  document.getElementById("result").hidden = true;
   api("/api/run", {url: url}).then(function (r) {
     if (r.error) {
-      document.getElementById("go").disabled = false;
-      showSteps(["Ошибка: " + r.error], false, true);
+      setBusy(false);
+      showSteps([r.error], "failed");
       return;
     }
     job = r.job;
-    showSteps(["Начинаю…"], true, false);
+    showSteps(["Начинаю"], "running");
     timer = setInterval(poll, 800);
   });
 };
@@ -313,32 +548,34 @@ document.getElementById("url").addEventListener("keydown", function (e) {
 });
 
 document.querySelectorAll("#tabs button").forEach(function (b) {
-  b.onclick = function () {
-    tab = b.dataset.tab;
-    document.querySelectorAll("#tabs button").forEach(function (x) {
-      x.className = x === b ? "on" : "";
-    });
-    render();
-  };
+  b.onclick = function () { selectTab(b.dataset.tab); };
 });
 
 document.getElementById("copy").onclick = function () {
-  navigator.clipboard.writeText(data[tab] || "").then(function () {
-    var btn = document.getElementById("copy");
-    btn.textContent = "Скопировано";
-    setTimeout(function () { btn.textContent = "Скопировать"; }, 1500);
+  navigator.clipboard.writeText(current[tab] || "").then(function () {
+    var label = document.getElementById("copyLabel");
+    label.textContent = "Скопировано";
+    setTimeout(function () { label.textContent = "Копировать"; }, 1600);
   });
 };
 
 document.getElementById("reveal").onclick = function () { api("/api/reveal", {path: outDir}); };
 
-document.getElementById("gear").onclick = function () {
-  document.getElementById("settings").classList.toggle("open");
+/* --- настройки --- */
+var sheet = document.getElementById("sheet");
+function openSheet() {
+  sheet.classList.add("open");
   loadModels();
-};
-document.getElementById("closeSettings").onclick = function () {
-  document.getElementById("settings").classList.remove("open");
-};
+  document.getElementById("modelPath").focus();
+}
+function closeSheet() { sheet.classList.remove("open"); }
+
+document.getElementById("gear").onclick = openSheet;
+document.getElementById("closeSettings").onclick = closeSheet;
+sheet.addEventListener("click", function (e) { if (e.target === sheet) { closeSheet(); } });
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape" && sheet.classList.contains("open")) { closeSheet(); }
+});
 
 document.getElementById("saveSettings").onclick = function () {
   api("/api/settings", {
@@ -346,38 +583,39 @@ document.getElementById("saveSettings").onclick = function () {
     audience: document.getElementById("audience").value,
     out_dir: document.getElementById("outDir").value,
     whisper: document.getElementById("whisper").value
-  }).then(function (r) {
-    applySettings(r.settings);
-    document.getElementById("settings").classList.remove("open");
-  });
+  }).then(function (r) { applySettings(r.settings); closeSheet(); });
 };
 
-// Список моделей на диске — чтобы не искать путь к файлу руками.
+document.getElementById("quit").onclick = function () {
+  api("/api/quit");
+  document.body.innerHTML =
+    "<div class='wrap'><div class='card'>NP Brief закрыт — вкладку можно закрыть.</div></div>";
+};
+
+// Модели на диске показываем списком: путь к файлу руками не набирают.
 function loadModels() {
-  var box = document.getElementById("modelList");
-  box.textContent = "Ищу модели…";
+  var help = document.getElementById("modelHelp");
+  var chips = document.getElementById("modelChips");
+  chips.innerHTML = "";
   api("/api/models").then(function (r) {
     if (!r.models.length) {
-      box.className = "hint err";
-      box.textContent = "Не нашёл ни одного файла .gguf. Искал в: " + r.dirs.join(", ");
+      help.textContent = "Файлов .gguf не нашлось. Положи модель в ~/Models — она появится здесь.";
       return;
     }
-    box.className = "hint models";
-    box.innerHTML = "Нашёл на маке: " + r.models.map(function (m) {
-      return "<a href='#' data-p='" + encodeURIComponent(m.path) + "'>" + m.name + "</a>";
-    }).join(" · ");
-    box.querySelectorAll("a").forEach(function (a) {
-      a.onclick = function (e) {
-        e.preventDefault();
-        document.getElementById("modelPath").value = decodeURIComponent(a.dataset.p);
+    help.textContent = "Найдено на этом маке — выбери или оставь пустым:";
+    var chosen = document.getElementById("modelPath").value.trim();
+    r.models.forEach(function (m) {
+      var b = document.createElement("button");
+      b.className = "chip" + (m.path === chosen ? " on" : "");
+      b.textContent = m.name;
+      b.onclick = function () {
+        document.getElementById("modelPath").value = m.path;
+        chips.querySelectorAll(".chip").forEach(function (c) { c.className = "chip"; });
+        b.className = "chip on";
       };
+      chips.appendChild(b);
     });
   });
-}
-
-function baseName(path) {
-  var parts = String(path || "").split("/");
-  return parts[parts.length - 1];
 }
 
 function applySettings(s) {
@@ -385,16 +623,7 @@ function applySettings(s) {
   document.getElementById("audience").value = s.audience || "";
   document.getElementById("outDir").value = s.out_dir || "";
   document.getElementById("whisper").value = s.whisper || "large-v3";
-  var badge = document.getElementById("modelBadge");
-  badge.textContent = s.model_path ? baseName(s.model_path) : "модель выберется сама";
 }
-
-document.getElementById("quit").onclick = function (e) {
-  e.preventDefault();
-  api("/api/quit");
-  document.body.innerHTML = "<div class='wrap'><div class='card'>NP Brief закрыт. " +
-    "Можно закрыть вкладку.</div></div>";
-};
 
 api("/api/state").then(function (s) { applySettings(s.settings); });
 </script>
