@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(
 
 from videobrief.transcript import (  # noqa: E402
     Segment, clean_text, dedupe_rolling, duration, format_tc, merge_blocks,
-    parse_timed_text, timed_text,
+    needs_condensing, parse_timed_text, split_lines, timed_text,
 )
 
 
@@ -85,6 +85,17 @@ def test_parse_timed_text_roundtrip():
 def test_parse_timed_text_ignores_other_lines():
     assert parse_timed_text("просто текст\n\n# заголовок") == []
     assert parse_timed_text("[1:02:05] длинный ролик")[0].start == 3725.0
+
+
+def test_split_lines_keeps_lines_whole():
+    """Длинный ролик режется на части по границам реплик, без потерь."""
+    text = "\n".join(f"[00:{i:02d}] реплика номер {i}" for i in range(20))
+    parts = split_lines(text, 120)
+    assert len(parts) > 1
+    assert all(len(p) <= 130 for p in parts)
+    # Склейка обязана дать исходный текст: ни одна реплика не разорвана.
+    assert "\n".join(parts) == text
+    assert needs_condensing(text, 120) and not needs_condensing(text, 100000)
 
 
 def run():

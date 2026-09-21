@@ -8,13 +8,13 @@
   :root {
     --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; --muted: #6e6e73;
     --line: #e3e3e6; --accent: #0071e3; --accent-text: #ffffff;
-    --ok: #1c7c3c; --err: #c4362c; --code: #f2f2f5;
+    --err: #c4362c; --code: #f2f2f5;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #1c1c1e; --card: #262629; --text: #f2f2f7; --muted: #9a9aa0;
       --line: #3a3a3d; --accent: #0a84ff; --accent-text: #ffffff;
-      --ok: #4cd964; --err: #ff6b5e; --code: #1f1f22;
+      --err: #ff6b5e; --code: #1f1f22;
     }
   }
   * { box-sizing: border-box; }
@@ -33,12 +33,12 @@
     padding: 18px; margin-bottom: 16px;
   }
   .row { display: flex; gap: 10px; }
-  input[type=text], input[type=password], select, textarea {
+  input[type=text], select {
     width: 100%; padding: 11px 13px; font-size: 15px; color: var(--text);
     background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
     font-family: inherit;
   }
-  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   button {
     font: inherit; font-weight: 500; padding: 11px 18px; border-radius: 10px;
     border: 1px solid var(--line); background: var(--card); color: var(--text);
@@ -52,6 +52,7 @@
   .steps li { padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
   .steps li:last-child { border-bottom: 0; }
   .steps li.now { color: var(--accent); }
+  .steps li.err { color: var(--err); }
   .spin { display: inline-block; width: 13px; height: 13px; margin-right: 8px;
           border: 2px solid var(--line); border-top-color: var(--accent);
           border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
@@ -61,21 +62,21 @@
   .tabs button.on { background: var(--accent); color: var(--accent-text); border-color: transparent; }
   .out h2 { font-size: 18px; margin: 22px 0 8px; }
   .out h3 { font-size: 15px; margin: 18px 0 6px; }
-  .out p, .out li { font-size: 15px; }
   .out table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
   .out th, .out td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
   .out th { background: var(--code); }
-  .out pre { background: var(--code); padding: 12px; border-radius: 10px; overflow: auto; }
   .plain { white-space: pre-wrap; font-size: 14px; line-height: 1.65; }
-  .err { color: var(--err); }
-  .ok { color: var(--ok); }
   .settings { display: none; }
   .settings.open { display: block; }
   .field { margin-bottom: 14px; }
   .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
   .muted { color: var(--muted); }
+  .err { color: var(--err); }
   .badge { font-size: 12px; color: var(--muted); border: 1px solid var(--line);
-           border-radius: 999px; padding: 3px 9px; }
+           border-radius: 999px; padding: 3px 9px; max-width: 320px;
+           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .models a { color: var(--accent); text-decoration: none; }
+  .models a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -87,34 +88,15 @@
       <div class="sub">ссылка на ролик → расшифровка → разбор и свой сценарий</div>
     </div>
     <div class="spacer"></div>
-    <span id="keyBadge" class="badge"></span>
+    <span id="modelBadge" class="badge"></span>
     <button class="icon" id="gear" title="Настройки">⚙︎</button>
   </header>
 
   <div class="card settings" id="settings">
     <div class="field">
-      <label for="engine">Чем разбирать</label>
-      <select id="engine">
-        <option value="auto">Авто — локальная модель, если запущена</option>
-        <option value="local">Только локальная модель (без интернета)</option>
-        <option value="claude">Только Claude (по ключу)</option>
-      </select>
-    </div>
-    <div class="field" id="localRow">
-      <label for="localModel">Локальная модель (Ollama, LM Studio, llama.cpp)</label>
-      <div class="row">
-        <input type="text" id="localModel" placeholder="пусто = выбрать самой (ищет Gemma)">
-        <button id="findLocal">Найти</button>
-      </div>
-      <div class="hint" id="localInfo"></div>
-    </div>
-    <div class="field">
-      <label for="localUrl">Адрес локального сервера (обычно не нужен)</label>
-      <input type="text" id="localUrl" placeholder="пусто = поиск: 11434, 1234, 8080">
-    </div>
-    <div class="field">
-      <label for="apiKey">Ключ Anthropic (нужен только для разбора в облаке)</label>
-      <input type="password" id="apiKey" placeholder="sk-ant-… — сохранится на этом маке" autocomplete="off">
+      <label for="modelPath">Модель для разбора (файл .gguf на этом маке)</label>
+      <input type="text" id="modelPath" placeholder="пусто = выбрать самой">
+      <div class="hint models" id="modelList">Ищу модели…</div>
     </div>
     <div class="field">
       <label for="audience">Под кого делаем свою версию</label>
@@ -125,7 +107,7 @@
       <input type="text" id="outDir">
     </div>
     <div class="field">
-      <label for="whisper">Распознавание, если у ролика нет субтитров</label>
+      <label for="whisper">Распознавание речи, если у ролика нет субтитров</label>
       <select id="whisper">
         <option value="large-v3">large-v3 — точнее, но дольше</option>
         <option value="medium">medium — быстрее</option>
@@ -143,16 +125,8 @@
       <input type="text" id="url" placeholder="Вставь ссылку: YouTube, Instagram, TikTok…" autofocus>
       <button class="primary" id="go">Разобрать</button>
     </div>
-    <div class="row" style="margin-top:10px">
-      <select id="mode" style="max-width:280px">
-        <option value="auto">Текст: как получится (быстро)</option>
-        <option value="subs">Только субтитры ролика</option>
-        <option value="asr">Только распознавание звука</option>
-      </select>
-      <div class="hint" id="hint" style="margin-top:11px">
-        Ролик может быть на любом языке — разбор всегда на русском.
-      </div>
-    </div>
+    <div class="hint">Ролик может быть на любом языке — разбор всегда на русском.
+      Всё считается на этом маке, без интернета для разбора.</div>
   </div>
 
   <div class="card" id="progress" style="display:none">
@@ -162,7 +136,7 @@
   <div class="card" id="result" style="display:none">
     <div class="row" style="align-items:center;margin-bottom:12px">
       <strong id="title"></strong>
-      <span class="badge" id="engineNote"></span>
+      <span class="badge" id="modelNote"></span>
       <div class="spacer"></div>
       <button id="copy">Скопировать</button>
       <button id="reveal">Показать в Finder</button>
@@ -177,15 +151,14 @@
   </div>
 
   <div class="hint" style="text-align:center">
-    Разборы лежат в папке из настроек · <a href="#" id="quit">закрыть приложение</a>
+    Разборы лежат в папке из настроек · <a href="#" id="quit">закрыть программу</a>
   </div>
 
 </div>
 
 <script>
 var TOKEN = "__TOKEN__";
-var job = null, timer = null, data = {brief: "", clean: "", timed: ""}, tab = "brief",
-    outDir = "", settings = {};
+var job = null, timer = null, data = {brief: "", clean: "", timed: ""}, tab = "brief", outDir = "";
 
 function api(path, body) {
   var url = path + (path.indexOf("?") < 0 ? "?" : "&") + "t=" + encodeURIComponent(TOKEN);
@@ -199,8 +172,8 @@ function esc(s) {
 }
 
 // Маленький разметчик Markdown: заголовки, таблицы, списки, жирный/курсив.
-// Своими руками, потому что внешние библиотеки тянуть неоткуда — приложение
-// работает без интернета, кроме самих запросов к площадке и модели.
+// Своими руками, потому что внешние библиотеки тянуть неоткуда — программа
+// работает без интернета.
 function md(src) {
   var lines = esc(src).split("\n"), html = [], i = 0;
   function inline(t) {
@@ -241,9 +214,6 @@ function md(src) {
       html.push((ordered ? "<ol>" : "<ul>") + items.join("") + (ordered ? "</ol>" : "</ul>"));
       continue;
     }
-    if (/^\s*>/.test(line)) {
-      html.push("<p class='muted'>" + inline(line.replace(/^\s*>\s?/, "")) + "</p>"); i++; continue;
-    }
     if (!line.trim()) { i++; continue; }
     var para = [];
     while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|\s*\||\s*([-*•]|\d+\.)\s)/.test(lines[i])) {
@@ -265,9 +235,8 @@ function render() {
   }
 }
 
-function showSteps(steps, running) {
-  var box = document.getElementById("progress");
-  box.style.display = "block";
+function showSteps(steps, running, failed) {
+  document.getElementById("progress").style.display = "block";
   var list = document.getElementById("steps");
   list.innerHTML = "";
   steps.forEach(function (s, idx) {
@@ -277,7 +246,8 @@ function showSteps(steps, running) {
       li.className = "now";
       li.innerHTML = "<span class='spin'></span>" + esc(s);
     } else {
-      li.textContent = "✓ " + s;
+      li.textContent = (last && failed ? "" : "✓ ") + s;
+      if (last && failed) { li.className = "err"; }
     }
     list.appendChild(li);
   });
@@ -287,15 +257,14 @@ function finish(res) {
   document.getElementById("go").disabled = false;
   document.getElementById("result").style.display = "block";
   document.getElementById("title").textContent = res.title || "Готово";
-  var note = document.getElementById("engineNote");
-  note.textContent = res.engine_note ? "разобрано: " + res.engine_note : "";
+  document.getElementById("modelNote").textContent = res.model_note || "";
   outDir = res.out_dir;
   data = {brief: res.brief || "", clean: res.clean || "", timed: res.timed || ""};
   var warn = document.getElementById("warn");
   if (res.analysis_error) {
     warn.style.display = "block";
     warn.textContent = res.analysis_error;
-    tab = res.brief ? "brief" : "clean";
+    tab = "clean";
   } else {
     warn.style.display = "none";
     tab = "brief";
@@ -310,14 +279,13 @@ function poll() {
   api("/api/state?job=" + encodeURIComponent(job)).then(function (state) {
     var j = state.job;
     if (!j) { return; }
-    showSteps(j.steps, j.status === "running");
-    if (j.status === "running") { return; }
+    if (j.status === "running") { showSteps(j.steps, true, false); return; }
     clearInterval(timer); timer = null;
     if (j.status === "error") {
       document.getElementById("go").disabled = false;
-      showSteps(j.steps.concat(["Ошибка: " + j.error]), false);
-      document.getElementById("steps").lastChild.className = "err";
+      showSteps(j.steps.concat(["Ошибка: " + j.error]), false, true);
     } else {
+      showSteps(j.steps, false, false);
       finish(j.result);
     }
   });
@@ -328,14 +296,14 @@ document.getElementById("go").onclick = function () {
   if (!url) { document.getElementById("url").focus(); return; }
   this.disabled = true;
   document.getElementById("result").style.display = "none";
-  api("/api/run", {url: url, mode: document.getElementById("mode").value}).then(function (r) {
+  api("/api/run", {url: url}).then(function (r) {
     if (r.error) {
       document.getElementById("go").disabled = false;
-      showSteps(["Ошибка: " + r.error], false);
+      showSteps(["Ошибка: " + r.error], false, true);
       return;
     }
     job = r.job;
-    showSteps(["Начинаю…"], true);
+    showSteps(["Начинаю…"], true, false);
     timer = setInterval(poll, 800);
   });
 };
@@ -362,12 +330,11 @@ document.getElementById("copy").onclick = function () {
   });
 };
 
-document.getElementById("reveal").onclick = function () {
-  api("/api/reveal", {path: outDir});
-};
+document.getElementById("reveal").onclick = function () { api("/api/reveal", {path: outDir}); };
 
 document.getElementById("gear").onclick = function () {
   document.getElementById("settings").classList.toggle("open");
+  loadModels();
 };
 document.getElementById("closeSettings").onclick = function () {
   document.getElementById("settings").classList.remove("open");
@@ -375,70 +342,52 @@ document.getElementById("closeSettings").onclick = function () {
 
 document.getElementById("saveSettings").onclick = function () {
   api("/api/settings", {
-    engine: document.getElementById("engine").value,
-    local_model: document.getElementById("localModel").value.trim(),
-    local_url: document.getElementById("localUrl").value.trim(),
-    api_key: document.getElementById("apiKey").value,
+    model_path: document.getElementById("modelPath").value.trim(),
     audience: document.getElementById("audience").value,
     out_dir: document.getElementById("outDir").value,
     whisper: document.getElementById("whisper").value
   }).then(function (r) {
-    document.getElementById("apiKey").value = "";
     applySettings(r.settings);
     document.getElementById("settings").classList.remove("open");
   });
 };
 
-function applySettings(s) {
-  settings = s;
-  document.getElementById("audience").value = s.audience || "";
-  document.getElementById("outDir").value = s.out_dir || "";
-  document.getElementById("whisper").value = s.whisper || "large-v3";
-  document.getElementById("engine").value = s.engine || "auto";
-  document.getElementById("localModel").value = s.local_model || "";
-  document.getElementById("localUrl").value = s.local_url || "";
-  var badge = document.getElementById("keyBadge");
-  if (s.engine === "claude") {
-    badge.textContent = s.api_key_set ? "облако · ключ " + s.api_key_hint : "ключ не задан";
-    badge.className = "badge" + (s.api_key_set ? "" : " err");
-  } else {
-    badge.textContent = s.local_model ? "локально · " + s.local_model : "локальная модель";
-    badge.className = "badge";
-  }
-  document.getElementById("hint").textContent =
-    "Ролик может быть на любом языке — разбор всегда на русском.";
-}
-
-// Что сейчас запущено на устройстве. Кнопка «Найти» — чтобы не гадать, как
-// называется модель: имена у Ollama вида «gemma3:12b», их проще выбрать из списка.
-document.getElementById("findLocal").onclick = function () {
-  var info = document.getElementById("localInfo");
-  info.className = "hint";
-  info.textContent = "Ищу…";
-  api("/api/local").then(function (r) {
-    if (r.error) {
-      info.className = "hint err";
-      info.textContent = r.error;
-      return;
-    }
+// Список моделей на диске — чтобы не искать путь к файлу руками.
+function loadModels() {
+  var box = document.getElementById("modelList");
+  box.textContent = "Ищу модели…";
+  api("/api/models").then(function (r) {
     if (!r.models.length) {
-      info.className = "hint err";
-      info.textContent = "Сервер " + r.kind + " отвечает (" + r.base + "), но моделей нет.";
+      box.className = "hint err";
+      box.textContent = "Не нашёл ни одного файла .gguf. Искал в: " + r.dirs.join(", ");
       return;
     }
-    info.className = "hint";
-    info.innerHTML = "Нашёл " + r.kind + " на " + r.base + ": " +
-      r.models.map(function (m) {
-        return "<a href='#' data-m='" + m + "'>" + m + "</a>";
-      }).join(" · ");
-    info.querySelectorAll("a").forEach(function (a) {
+    box.className = "hint models";
+    box.innerHTML = "Нашёл на маке: " + r.models.map(function (m) {
+      return "<a href='#' data-p='" + encodeURIComponent(m.path) + "'>" + m.name + "</a>";
+    }).join(" · ");
+    box.querySelectorAll("a").forEach(function (a) {
       a.onclick = function (e) {
         e.preventDefault();
-        document.getElementById("localModel").value = a.dataset.m;
+        document.getElementById("modelPath").value = decodeURIComponent(a.dataset.p);
       };
     });
   });
-};
+}
+
+function baseName(path) {
+  var parts = String(path || "").split("/");
+  return parts[parts.length - 1];
+}
+
+function applySettings(s) {
+  document.getElementById("modelPath").value = s.model_path || "";
+  document.getElementById("audience").value = s.audience || "";
+  document.getElementById("outDir").value = s.out_dir || "";
+  document.getElementById("whisper").value = s.whisper || "large-v3";
+  var badge = document.getElementById("modelBadge");
+  badge.textContent = s.model_path ? baseName(s.model_path) : "модель выберется сама";
+}
 
 document.getElementById("quit").onclick = function (e) {
   e.preventDefault();

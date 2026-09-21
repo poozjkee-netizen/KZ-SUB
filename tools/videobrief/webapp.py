@@ -1,14 +1,12 @@
-"""NP Brief — окно приложения: вставил ссылку, нажал кнопку, получил разбор.
+"""Окно NP Brief: вставил ссылку, нажал кнопку, получил разбор.
 
 Устроено как крошечный локальный сервер на stdlib, окно которого открывается в
-браузере. Почему так, а не «настоящее» окно: нативный GUI на Python тянет
-зависимости (PyObjC/Tk), которые ломаются от версии к версии macOS, а тут ноль
-зависимостей сверх самого инструмента, и интерфейс одинаково работает на любом
-маке. Для человека разницы нет: он двойным кликом открывает NP Brief.app.
+браузере. Нативное окно на Python тянет PyObjC/Tk — они ломаются от версии к
+версии macOS; здесь ноль зависимостей сверх самой программы, а для человека это
+всё равно двойной клик по NP Brief.app.
 
-Сервер слушает ТОЛЬКО 127.0.0.1 и требует токен, который печатается в адресе при
-запуске: без него запрос отклоняется. Это защита от чужих страниц в браузере —
-они не могут узнать токен, а значит и дёрнуть прогон или прочитать настройки.
+Слушает только 127.0.0.1 и требует токен из адреса: без него чужая страница в
+браузере могла бы запустить прогон и прочитать настройки.
 """
 from __future__ import annotations
 
@@ -27,8 +25,7 @@ if __package__ in (None, ""):  # запуск файлом: python webapp.py
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     __package__ = "videobrief"
 
-from . import appconfig, local_llm, media, pipeline  # noqa: E402
-from .config import settings as env_settings  # noqa: E402
+from . import llm, media, pipeline, settings  # noqa: E402
 
 UI_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui.html")
 TOKEN = secrets.token_urlsafe(16)
@@ -38,35 +35,11 @@ _jobs: dict[str, dict] = {}
 _current: str | None = None
 
 
-def _new_job(url: str) -> dict:
-    return {"id": uuid.uuid4().hex[:12], "url": url, "status": "running",
-            "steps": ["Начинаю…"], "error": None, "result": None}
-
-
-def _run_job(job: dict, values: dict) -> None:
+def _run_job(job: dict) -> None:
     """Прогон в фоне. Шаги копятся в job['steps'] — окно их опрашивает."""
     global _current
-
-    def step(message: str) -> None:
-        job["steps"].append(message)
-
-    opts = pipeline.Options(
-        source=job["url"],
-        out_root=values.get("out_dir") or appconfig.default_out_dir(),
-        audience=values.get("audience") or pipeline.AUDIENCE_DEFAULT,
-        mode=values.get("mode") or "auto",
-        auto_subs=bool(values.get("auto_subs", True)),
-        whisper=values.get("whisper") or env_settings.whisper_model,
-        model=values.get("model") or env_settings.model,
-        # Разбор доступен и без ключа: локальная модель работает на устройстве.
-        analyze=True,
-        api_key=values.get("api_key") or None,
-        engine=values.get("engine") or env_settings.engine,
-        local_url=values.get("local_url") or env_settings.local_url,
-        local_model=values.get("local_model") or env_settings.local_model,
-    )
     try:
-        result = pipeline.run(opts, step)
+        result = pipeline.run(pipeline.Options(source=job["url"]), job["steps"].append)
     except (media.MediaError, RuntimeError, OSError) as exc:
         job["status"] = "error"
         job["error"] = str(exc)
@@ -75,15 +48,13 @@ def _run_job(job: dict, values: dict) -> None:
         job["result"] = {
             "out_dir": result.out_dir,
             "title": result.meta.get("title") or "",
-            "source_note": result.source_note,
             "brief": result.files.get("brief", ""),
             "clean": result.files.get("clean", ""),
             "timed": result.files.get("timed", ""),
             "analysis_error": result.analysis_error,
-            "analyzed": bool(result.brief_path),
-            "engine_note": result.engine_note,
+            "model_note": result.model_note,
         }
-        step("Готово")
+        job["steps"].append("Готово")
     finally:
         with _lock:
             _current = None
@@ -95,8 +66,6 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args) -> None:  # тише в консоли: это не веб-сервер
         pass
 
-    # --- вспомогательное ---
-
     def _authorized(self, query: dict) -> bool:
         return secrets.compare_digest((query.get("t") or [""])[0], TOKEN)
 
@@ -104,7 +73,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
-        # Окно — единственный клиент; чужим страницам тут делать нечего.
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
@@ -122,8 +90,6 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             return {}
 
-    # --- маршруты ---
-
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
@@ -135,22 +101,16 @@ class Handler(BaseHTTPRequestHandler):
             with open(UI_PATH, "rb") as fh:
                 page = fh.read().replace(b"__TOKEN__", TOKEN.encode())
             self._send(200, page, "text/html; charset=utf-8")
-        elif parsed.path == "/api/local":
-            # Что сейчас запущено на устройстве: сервер и список моделей.
-            try:
-                server = local_llm.detect(appconfig.load().get("local_url", ""))
-            except local_llm.LocalLLMError as exc:
-                self._json({"error": str(exc)})
-            else:
-                self._json({"base": server.base, "kind": server.kind,
-                            "models": server.models})
         elif parsed.path == "/api/state":
             job_id = (query.get("job") or [""])[0]
-            self._json({
-                "settings": appconfig.masked(appconfig.load()),
-                "job": _jobs.get(job_id),
-                "busy": _current is not None,
-            })
+            self._json({"settings": settings.load(), "job": _jobs.get(job_id)})
+        elif parsed.path == "/api/models":
+            # Что лежит на диске: показываем список, чтобы не заставлять
+            # человека искать путь к файлу руками.
+            models = llm.find_models()
+            self._json({"models": [{"path": p, "name": os.path.basename(p)}
+                                   for p in models[:20]],
+                        "dirs": [os.path.expanduser(d) for d in llm.MODEL_DIRS]})
         else:
             self._send(404, b"Not found", "text/plain; charset=utf-8")
 
@@ -171,19 +131,15 @@ class Handler(BaseHTTPRequestHandler):
                 if _current is not None:
                     self._json({"error": "Уже разбираю один ролик — дождись конца."}, 409)
                     return
-                job = _new_job(url)
+                job = {"id": uuid.uuid4().hex[:12], "url": url, "status": "running",
+                       "steps": ["Начинаю…"], "error": None, "result": None}
                 _jobs[job["id"]] = job
                 _current = job["id"]
-            values = appconfig.load()
-            values.update({k: body[k] for k in ("mode", "audience") if body.get(k)})
-            threading.Thread(target=_run_job, args=(job, values), daemon=True).start()
+            threading.Thread(target=_run_job, args=(job,), daemon=True).start()
             self._json({"job": job["id"]})
 
         elif parsed.path == "/api/settings":
-            # Пустой ключ не затирает сохранённый: поле в окне всегда пустое,
-            # иначе любое сохранение настроек стирало бы ключ.
-            values = {k: v for k, v in body.items() if k != "api_key" or (v or "").strip()}
-            self._json({"settings": appconfig.masked(appconfig.save(values))})
+            self._json({"settings": settings.save(body)})
 
         elif parsed.path == "/api/reveal":
             path = (body.get("path") or "").strip()
@@ -203,7 +159,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def serve(port: int = 0, open_browser: bool = True) -> None:
-    """Поднимает окно приложения. port=0 — свободный порт выберет система."""
+    """Поднимает окно программы. port=0 — свободный порт выберет система."""
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     url = f"http://127.0.0.1:{httpd.server_address[1]}/?t={TOKEN}"
     print(f"NP Brief: {url}", flush=True)

@@ -137,6 +137,35 @@ def parse_timed_text(content: str) -> list[Segment]:
     return segments
 
 
+def split_lines(text: str, max_chars: int) -> list[str]:
+    """Режет текст на части не длиннее max_chars, не разрывая строки.
+
+    Нужно для длинных роликов: окно локальной модели меньше, чем расшифровка
+    часовой беседы. Граница части всегда проходит между репликами, поэтому в
+    каждой части остаются свои тайм-коды и её можно сжать отдельно.
+    """
+    if max_chars <= 0:
+        return [text] if text.strip() else []
+    parts: list[str] = []
+    current: list[str] = []
+    size = 0
+    for line in text.splitlines():
+        extra = len(line) + 1
+        if current and size + extra > max_chars:
+            parts.append("\n".join(current))
+            current, size = [], 0
+        current.append(line)
+        size += extra
+    if current:
+        parts.append("\n".join(current))
+    return [p for p in parts if p.strip()]
+
+
+def needs_condensing(text: str, max_chars: int) -> bool:
+    """Нужен ли предварительный пересказ по частям."""
+    return max_chars > 0 and len(text) > max_chars
+
+
 def duration(segments: list[Segment]) -> float:
     """Длительность по последнему сегменту (когда метаданных ролика нет)."""
     return max((seg.end for seg in segments), default=0.0)

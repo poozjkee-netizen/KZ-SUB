@@ -50,8 +50,12 @@ python3 -m venv "$VENV"
 "$VENV/bin/python" -m pip install --upgrade pip >/dev/null
 
 STEP="установка зависимостей (pip)"
-say "2/4 Ставлю зависимости: yt-dlp, anthropic, faster-whisper…"
-"$VENV/bin/python" -m pip install -r "$REPO_DIR/tools/videobrief/requirements.txt"
+say "2/4 Ставлю зависимости: yt-dlp, faster-whisper, llama-cpp-python…"
+say "    (llama-cpp-python может собираться несколько минут — это разово)"
+# Индекс с готовыми колёсами под Metal: если колесо для твоей версии Python
+# есть, сборка из исходников не понадобится. Если нет — pip соберёт сам.
+"$VENV/bin/python" -m pip install -r "$REPO_DIR/tools/videobrief/requirements.txt" \
+  --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/metal
 
 STEP="копирование файлов программы"
 say "3/4 Копирую приложение…"
@@ -108,15 +112,20 @@ say ""
 say "Готово. NP Brief лежит в ~/Applications."
 echo "Открой его двойным кликом — откроется окно в браузере."
 echo ""
-if command -v ollama >/dev/null 2>&1; then
-  echo "Ollama на месте — разбор пойдёт на твоём маке, без интернета и ключей."
-  echo "Модели, которые у тебя есть:"
-  ollama list 2>/dev/null | sed -n '2,6p' | awk '{print "    " $1}'
-  echo "Если Ollama не запущена, подними её:  ollama serve"
+echo "Разбор идёт на этом маке: программа читает файл модели .gguf напрямую."
+FOUND=$("$VENV/bin/python" - <<PYFIND
+import sys
+sys.path.insert(0, "$SUPPORT/app")
+from videobrief import llm
+for path in llm.find_models()[:5]:
+    print("    " + path)
+PYFIND
+)
+if [ -n "$FOUND" ]; then
+  echo "Нашёл на маке модели:"
+  echo "$FOUND"
 else
-  echo "Разбор можно делать двумя способами (выбирается в окне, ⚙︎):"
-  echo "  • на устройстве — Ollama / LM Studio / llama.cpp с локальной моделью;"
-  echo "  • в облаке — ключ Anthropic."
+  echo "Моделей .gguf не нашёл. Положи файл в ~/Models — программа подхватит."
 fi
 echo ""
 echo "Открыть сейчас:  open \"$APP_DIR\""

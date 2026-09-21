@@ -1,45 +1,43 @@
-"""Распознавание речи, когда готовых субтитров у ролика нет.
+"""Распознавание речи, когда у ролика нет готовых субтитров.
 
-Отдельно от backend/app/transcribe.py намеренно: там язык жёстко зафиксирован
-казахским (продукт про казахский), а сюда прилетает виральный контент на любом
-языке — нужен авто-детект. Общего кода почти нет, а связывать два режима ради
-экономии десяти строк значит рисковать продом ради утилиты.
+Язык не задаём: прилетает виральный контент на любом языке, и авто-детект
+Whisper тут единственно верный. Считает на процессоре — ctranslate2 (движок
+faster-whisper) видеокарту мака не использует, поэтому вариантов «cpu/gpu» в
+настройках нет: они были бы обманом.
 """
 from __future__ import annotations
 
 from .transcript import Segment
 
 _model = None
-_model_key: tuple[str, str, str] | None = None
+_model_name: str | None = None
 
 
-def _get_model(name: str, device: str, compute_type: str):
-    global _model, _model_key
-    key = (name, device, compute_type)
-    if _model is None or _model_key != key:
-        # Импорт внутри функции: без faster-whisper инструмент обязан работать
-        # на готовых субтитрах и на своём файле расшифровки.
+def _get_model(name: str):
+    global _model, _model_name
+    if _model is None or _model_name != name:
+        # Импорт внутри функции: без faster-whisper программа обязана работать
+        # на готовых субтитрах и на своей расшифровке.
         try:
             from faster_whisper import WhisperModel
         except ImportError as exc:  # pragma: no cover — зависит от окружения
             raise RuntimeError(
-                "Не установлен faster-whisper. Поставь его (pip install faster-whisper) "
-                "или возьми ролик с готовыми субтитрами."
+                "Не установлен faster-whisper — это он распознаёт речь.\n"
+                "Поставь его: pip install faster-whisper"
             ) from exc
-        _model = WhisperModel(name, device=device, compute_type=compute_type)
-        _model_key = key
+        _model = WhisperModel(name, device="cpu", compute_type="int8")
+        _model_name = name
     return _model
 
 
-def transcribe(path: str, model_name: str, device: str, compute_type: str,
+def transcribe(path: str, model_name: str = "large-v3",
                language: str | None = None) -> tuple[list[Segment], str]:
     """Аудиофайл -> (сегменты, определённый язык).
 
-    language=None — авто-детект: ролик может быть на любом языке, и угадывать
-    за пользователя тут нельзя. VAD включён: он отсекает музыкальные проигрыши,
-    на которых Whisper любит выдумывать реплики.
+    VAD включён: он отсекает музыкальные проигрыши, на которых Whisper любит
+    выдумывать реплики.
     """
-    model = _get_model(model_name, device, compute_type)
+    model = _get_model(model_name)
     segments_iter, info = model.transcribe(
         path,
         language=language or None,

@@ -1,10 +1,8 @@
-"""VIDEO BRIEF — командная строка поверх общего конвейера (pipeline.py).
+"""NP Brief из командной строки — тот же прогон, что и в окне программы.
 
-Запуск из корня репозитория:
     python -m tools.videobrief "https://www.youtube.com/watch?v=..."
 
-То же самое умеет приложение для Mac (webapp.py) — оно зовёт тот же pipeline.run.
-Что получится в папке out/briefs/<ролик>/ — см. docs/VIDEO_BRIEF.md.
+Окно: python -m tools.videobrief.webapp. Подробности — docs/VIDEO_BRIEF.md.
 """
 from __future__ import annotations
 
@@ -17,65 +15,32 @@ if __package__ in (None, ""):  # запуск файлом: python tools/videobr
     __package__ = "videobrief"
 
 from . import media, pipeline  # noqa: E402
-from .config import settings  # noqa: E402
-
-
-def _parse_args(argv: list[str]) -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        prog="python -m tools.videobrief",
-        description="Ссылка на видео -> транскрипция -> разбор и сценарий на русском",
-    )
-    p.add_argument("source", help="ссылка на ролик или путь к локальному файлу")
-    p.add_argument("--out", default=settings.out_dir, help="куда складывать результат")
-    p.add_argument("--audience", default=pipeline.AUDIENCE_DEFAULT,
-                   help="под кого делаем свою версию (влияет на разбор)")
-    p.add_argument("--mode", choices=("auto", "subs", "asr"), default="auto",
-                   help="откуда брать текст: готовые субтитры, распознавание или "
-                        "как получится (по умолчанию)")
-    p.add_argument("--no-auto-subs", action="store_true",
-                   help="не брать авто-субтитры площадки (они без пунктуации), "
-                        "а распознавать звук")
-    p.add_argument("--transcript", default=None,
-                   help="готовая расшифровка (.vtt/.srt/.txt) — пропустить скачивание")
-    p.add_argument("--lang", default=None,
-                   help="язык речи для распознавания (по умолчанию — авто-детект)")
-    p.add_argument("--engine", choices=("auto", "local", "claude"),
-                   default=settings.engine,
-                   help="чем разбирать: auto (сначала локальная модель), "
-                        "local (только на устройстве), claude (по ключу)")
-    p.add_argument("--local-url", default=settings.local_url,
-                   help="адрес локального сервера моделей "
-                        "(пусто — поиск: Ollama 11434, LM Studio 1234, llama.cpp 8080)")
-    p.add_argument("--local-model", default=settings.local_model,
-                   help="локальная модель; хватит куска имени: gemma")
-    p.add_argument("--model", default=settings.model, help="облачная модель разбора")
-    p.add_argument("--effort", default=settings.effort,
-                   help="глубина разбора: low|medium|high|xhigh|max")
-    p.add_argument("--max-tokens", type=int, default=settings.max_tokens,
-                   help="потолок длины разбора")
-    p.add_argument("--whisper", default=settings.whisper_model, help="модель Whisper")
-    p.add_argument("--device", default=settings.device, help="cpu | cuda")
-    p.add_argument("--compute-type", default=settings.compute_type,
-                   help="int8 (cpu) | float16 (gpu)")
-    p.add_argument("--no-analysis", action="store_true",
-                   help="только расшифровка и готовый промпт, без обращения к модели")
-    p.add_argument("--keep-audio", action="store_true",
-                   help="не удалять скачанное аудио и субтитры (лежат в <out>/.work)")
-    p.add_argument("--quiet", action="store_true", help="без промежуточных сообщений")
-    return p.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parse_args(argv if argv is not None else sys.argv[1:])
+    p = argparse.ArgumentParser(
+        prog="python -m tools.videobrief",
+        description="Ссылка на видео -> расшифровка -> разбор и сценарий на русском",
+    )
+    p.add_argument("source", help="ссылка на ролик или путь к локальному файлу")
+    p.add_argument("--out", default="", help="куда складывать результат")
+    p.add_argument("--audience", default="", help="под кого делаем свою версию")
+    p.add_argument("--model", default="", help="файл модели .gguf для разбора")
+    p.add_argument("--whisper", default="", help="модель распознавания речи")
+    p.add_argument("--mode", choices=("auto", "subs", "asr"), default="auto",
+                   help="откуда брать текст (по умолчанию — как получится)")
+    p.add_argument("--transcript", default=None,
+                   help="готовая расшифровка (.vtt/.srt/.txt) — пропустить скачивание")
+    p.add_argument("--lang", default=None, help="язык речи (по умолчанию — авто)")
+    p.add_argument("--no-analysis", action="store_true",
+                   help="только расшифровка и готовый промпт, без разбора")
+    p.add_argument("--quiet", action="store_true", help="без промежуточных сообщений")
+    args = p.parse_args(argv if argv is not None else sys.argv[1:])
 
     opts = pipeline.Options(
         source=args.source, out_root=args.out, audience=args.audience,
-        mode=args.mode, auto_subs=not args.no_auto_subs, transcript=args.transcript,
-        lang=args.lang, model=args.model, effort=args.effort,
-        max_tokens=args.max_tokens, whisper=args.whisper, device=args.device,
-        compute_type=args.compute_type, analyze=not args.no_analysis,
-        keep_work=args.keep_audio, engine=args.engine,
-        local_url=args.local_url, local_model=args.local_model,
+        model_path=args.model, whisper=args.whisper, mode=args.mode,
+        transcript=args.transcript, lang=args.lang, analyze=not args.no_analysis,
     )
 
     def step(message: str) -> None:
@@ -90,8 +55,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if result.analysis_error:
         print(f"Ошибка разбора: {result.analysis_error}", file=sys.stderr)
-        print(f"Расшифровка и промпт всё равно сохранены: {result.out_dir}",
-              file=sys.stderr)
+        print(f"Расшифровка сохранена: {result.out_dir}", file=sys.stderr)
         return 2
 
     step("Готово.")

@@ -1,53 +1,72 @@
 """Весь прогон целиком: ссылка -> файлы на диске.
 
-Отдельно от cli.py, потому что у прогона два лица: командная строка и окно
-приложения (webapp.py). Разводить их по копиям кода нельзя — разойдутся.
-Поэтому здесь нет ни print, ни argparse: о ходе дела сообщает колбэк `on_step`.
+Один путь на всё: окно программы (webapp.py) и командная строка (cli.py) зовут
+отсюда `run`. О ходе дела сообщает колбэк `on_step` — ни print, ни HTTP тут нет.
+
+Порядок: метаданные -> текст (субтитры ролика или распознавание) -> чистка ->
+разбор локальной моделью -> файлы.
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import (asr, captions, local_llm, longtext, media, prompt as prompt_mod,
-               report, transcript as tr)
-from .config import settings
+from . import asr, captions, llm, media, prompt as prompt_mod, transcript as tr
+from .settings import load as load_settings
 
-AUDIENCE_DEFAULT = "русскоязычная аудитория СНГ"
+Step = Callable[[str], None]
+
+_TRANSLIT = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e",
+    "ж": "zh", "з": "z", "и": "i", "й": "i", "к": "k", "л": "l", "м": "m",
+    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
+    "ф": "f", "х": "h", "ц": "c", "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "",
+    "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+    "ә": "a", "ғ": "g", "қ": "q", "ң": "n", "ө": "o", "ұ": "u", "ү": "u",
+    "һ": "h", "і": "i",
+}
 
 
 @dataclass
 class Options:
-    """Что и как разбираем. Значения по умолчанию — как в командной строке."""
-    source: str                       # ссылка или путь к файлу
-    out_root: str = settings.out_dir
-    audience: str = AUDIENCE_DEFAULT
-    mode: str = "auto"                # auto | subs | asr
-    auto_subs: bool = True
-    transcript: str | None = None
-    lang: str | None = None
-    model: str = settings.model
-    effort: str = settings.effort
-    max_tokens: int = settings.max_tokens
-    whisper: str = settings.whisper_model
-    device: str = settings.device
-    compute_type: str = settings.compute_type
+    """Что и как разбираем. Пустые поля берутся из настроек программы."""
+    source: str                    # ссылка или путь к файлу
+    out_root: str = ""
+    audience: str = ""
+    model_path: str = ""           # .gguf; пусто = выбрать самой
+    whisper: str = ""
+    ctx: int = 0
+    max_chars: int = 0
+    mode: str = "auto"             # auto | subs | asr
+    transcript: str | None = None  # готовая расшифровка с диска
+    lang: str | None = None        # язык речи для распознавания
     analyze: bool = True
     keep_work: bool = False
-    api_key: str | None = None        # ключ из настроек приложения
-    engine: str = settings.engine     # auto | local | claude
-    local_url: str = settings.local_url
-    local_model: str = settings.local_model
-    local_ctx: int = settings.local_ctx
-    local_max_chars: int = settings.local_max_chars
+
+    def filled(self) -> "Options":
+        """Подставляет настройки туда, где пусто. Настройки читаются один раз."""
+        cfg = load_settings()
+        return Options(
+            source=self.source,
+            out_root=self.out_root or cfg["out_dir"],
+            audience=self.audience or cfg["audience"],
+            model_path=self.model_path or cfg["model_path"],
+            whisper=self.whisper or cfg["whisper"],
+            ctx=self.ctx or cfg["ctx"],
+            max_chars=self.max_chars or cfg["max_chars"],
+            mode=self.mode, transcript=self.transcript, lang=self.lang,
+            analyze=self.analyze, keep_work=self.keep_work,
+        )
 
 
 @dataclass
 class Result:
-    """Итог прогона: куда что легло и чем расшифровано."""
+    """Итог прогона: куда что легло, чем расшифровано и чем разобрано."""
     out_dir: str
     transcript_path: str
     timed_path: str
@@ -57,23 +76,12 @@ class Result:
     source_note: str
     brief_path: str | None = None
     analysis_error: str | None = None
-    engine_note: str = ""             # чем разобрано: модель и где она крутится
+    model_note: str = ""
     files: dict = field(default_factory=dict)
-
-
-Step = Callable[[str], None]
 
 
 def _noop(_: str) -> None:
     pass
-
-
-def _short(exc: Exception, limit: int = 60) -> str:
-    """Короткая причина отказа для строки статуса — без простыни из stderr."""
-    text = " ".join(str(exc).split())
-    if "429" in text:
-        return "площадка ограничила запросы"
-    return text[:limit] + ("…" if len(text) > limit else "")
 
 
 def _fill(meta: dict, key: str, value) -> None:
@@ -84,6 +92,63 @@ def _fill(meta: dict, key: str, value) -> None:
     """
     if not meta.get(key):
         meta[key] = value
+
+
+def _short(exc: Exception, limit: int = 60) -> str:
+    """Короткая причина отказа для строки статуса — без простыни из stderr."""
+    text = " ".join(str(exc).split())
+    if "429" in text:
+        return "площадка ограничила запросы"
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
+def slugify(title: str, fallback: str = "video") -> str:
+    """Название ролика -> имя папки: латиница, дефисы, не длиннее 60 символов.
+
+    Кириллица транслитерируется, а не выбрасывается: иначе все казахские и
+    русские ролики получили бы одно имя папки и затирали друг друга.
+    """
+    text = unicodedata.normalize("NFKC", title or "").lower()
+    out = []
+    for ch in text:
+        if ch in _TRANSLIT:
+            out.append(_TRANSLIT[ch])
+        elif ch.isalnum() and ch.isascii():
+            out.append(ch)
+        else:
+            out.append("-")
+    slug = re.sub(r"-{2,}", "-", "".join(out)).strip("-")[:60].strip("-")
+    return slug or fallback
+
+
+def folder_name(meta: dict) -> str:
+    """Имя папки ролика: '<название>-<id площадки>'.
+
+    Идентификатор в имени нужен против совпадений: у виральных роликов названия
+    повторяются, и без него один разбор затирал бы другой. Повторный прогон
+    того же ролика, наоборот, обязан попадать в ту же папку — поэтому
+    идентификатор, а не дата.
+    """
+    slug = slugify(meta.get("title") or "")
+    video_id = re.sub(r"[^A-Za-z0-9_-]", "", str(meta.get("id") or ""))[:12]
+    return f"{slug}-{video_id}" if video_id else slug
+
+
+def header(meta: dict, source_note: str, model_note: str) -> str:
+    """Шапка brief.md: откуда ролик, чем расшифрован, чем разобран."""
+    lines = [f"# Разбор: {meta.get('title') or 'ролик без названия'}", ""]
+    rows = [
+        ("Ссылка", meta.get("url")),
+        ("Автор", meta.get("uploader")),
+        ("Площадка", meta.get("platform")),
+        ("Длительность", tr.format_tc(meta["duration"]) if meta.get("duration") else None),
+        ("Просмотры", meta.get("view_count")),
+        ("Расшифровка", source_note),
+        ("Разбор", model_note),
+    ]
+    lines += [f"- **{name}:** {value}" for name, value in rows if value not in (None, "")]
+    lines.append("")
+    return "\n".join(lines)
 
 
 def read_transcript_file(path: str) -> list[tr.Segment]:
@@ -122,57 +187,92 @@ def collect(opts: Options, workdir: str,
         if meta.get("title"):
             on_step(f"Ролик: {meta['title']}")
         if opts.mode != "asr":
-            track = media.pick_subtitle_track(
-                info, [s.strip() for s in settings.sub_langs.split(",") if s.strip()],
-                allow_auto=opts.auto_subs,
-            )
-            if track:
-                lang, is_auto = track
-                kind = "авто-субтитры" if is_auto else "субтитры автора"
-                on_step(f"Беру {kind} ({lang}) — это быстро")
-                # Площадка может не отдать субтитры (429 «слишком много
-                # запросов», приватный ролик, сломанная дорожка). Это не повод
-                # ронять прогон: звук у нас уже есть откуда взять.
-                try:
-                    segments = captions.parse(
-                        media.fetch_subtitles(opts.source, lang, is_auto, workdir))
-                except media.MediaError as exc:
-                    if opts.mode == "subs":
-                        raise
-                    on_step(f"Субтитры не отдались ({_short(exc)}) — распознаю звук")
-                else:
-                    if segments:
-                        _fill(meta, "language", lang.split("-")[0])
-                        return segments, meta, f"{kind} ролика, язык {lang}", is_auto
-                    on_step("Субтитры пустые — распознаю звук")
-            elif opts.mode == "subs":
-                raise media.MediaError(
-                    "У ролика нет готовых субтитров, а режим «только субтитры» "
-                    "запрещает распознавание."
-                )
-            else:
-                on_step("Готовых субтитров нет — распознаю звук")
+            segments, note, is_auto = _try_subtitles(opts, info, meta, workdir, on_step)
+            if segments:
+                return segments, meta, note, is_auto
         if opts.mode == "subs":
             raise media.MediaError(
-                "Субтитры не дали текста, а режим «только субтитры» запрещает "
+                "Субтитров у ролика нет, а режим «только субтитры» запрещает "
                 "распознавание.")
         on_step("Скачиваю аудиодорожку…")
         audio_path = media.fetch_audio(opts.source, workdir)
 
     on_step(f"Распознаю речь ({opts.whisper}) — это самая долгая часть")
-    segments, detected = asr.transcribe(
-        audio_path, opts.whisper, opts.device, opts.compute_type, opts.lang)
+    segments, detected = asr.transcribe(audio_path, opts.whisper, opts.lang)
     if detected:
         _fill(meta, "language", detected)
     return segments, meta, f"Whisper {opts.whisper}, язык {detected or 'не определён'}", False
 
 
+def _try_subtitles(opts: Options, info: dict, meta: dict, workdir: str,
+                   on_step: Step) -> tuple[list[tr.Segment], str, bool]:
+    """Готовые субтитры ролика, если они есть и площадка их отдаёт.
+
+    Отказ площадки (429, приватный ролик, битая дорожка) не валит прогон: звук
+    всё равно можно распознать. Исключение — режим «только субтитры».
+    """
+    track = media.pick_subtitle_track(info, ["ru", "en", "kk"], allow_auto=True)
+    if not track:
+        on_step("Готовых субтитров нет — распознаю звук")
+        return [], "", False
+
+    lang, is_auto = track
+    kind = "авто-субтитры" if is_auto else "субтитры автора"
+    on_step(f"Беру {kind} ({lang}) — это быстро")
+    try:
+        segments = captions.parse(
+            media.fetch_subtitles(opts.source, lang, is_auto, workdir))
+    except media.MediaError as exc:
+        if opts.mode == "subs":
+            raise
+        on_step(f"Субтитры не отдались ({_short(exc)}) — распознаю звук")
+        return [], "", False
+
+    if not segments:
+        on_step("Субтитры пустые — распознаю звук")
+        return [], "", False
+    _fill(meta, "language", lang.split("-")[0])
+    return segments, f"{kind} ролика, язык {lang}", is_auto
+
+
+def analyze(opts: Options, meta: dict, timed: str, source_note: str,
+            on_step: Step) -> tuple[str, str]:
+    """Разбор локальной моделью. Длинную расшифровку сначала сжимает по частям."""
+    models = llm.find_models()
+    model_path = llm.pick(models, opts.model_path)
+    if not model_path:
+        raise llm.LLMError(
+            "Не нашёл ни одной модели .gguf. Положи её в ~/Models или укажи "
+            "файл в настройках (⚙︎)."
+        )
+    name = os.path.basename(model_path)
+
+    note = source_note
+    if tr.needs_condensing(timed, opts.max_chars):
+        parts = tr.split_lines(timed, opts.max_chars)
+        notes: list[str] = []
+        for index, part in enumerate(parts, 1):
+            on_step(f"Ролик длинный: сжимаю часть {index} из {len(parts)}")
+            notes.append(llm.generate(
+                model_path, prompt_mod.CONDENSE_SYSTEM,
+                prompt_mod.build_condense(part, index, len(parts)), ctx=opts.ctx))
+        timed = "\n\n".join(notes)
+        note = f"{source_note}; длинный ролик сжат по частям"
+
+    on_step(f"Разбираю на устройстве: {name}")
+    task = prompt_mod.build(meta, timed, opts.audience, note)
+    text = llm.generate(model_path, prompt_mod.SYSTEM, task, ctx=opts.ctx,
+                        max_tokens=8192)
+    return text, name
+
+
 def run(opts: Options, on_step: Step = _noop) -> Result:
     """Полный прогон. Бросает MediaError/RuntimeError, если материал не достался.
 
-    Ошибка разбора моделью прогон НЕ валит: расшифровка уже получена и стоила
-    времени, поэтому она сохраняется, а причина кладётся в `analysis_error`.
+    Ошибка разбора прогон НЕ валит: расшифровка уже получена и стоила времени,
+    поэтому она сохраняется, а причина кладётся в `analysis_error`.
     """
+    opts = opts.filled()
     out_root = os.path.abspath(opts.out_root)
     workdir = os.path.join(out_root, ".work")
     os.makedirs(workdir, exist_ok=True)
@@ -188,24 +288,21 @@ def run(opts: Options, on_step: Step = _noop) -> Result:
     blocks = tr.merge_blocks(segments)
     _fill(meta, "duration", tr.duration(segments))
 
-    out_dir = os.path.join(out_root, report.folder_name(meta))
+    out_dir = os.path.join(out_root, folder_name(meta))
     os.makedirs(out_dir, exist_ok=True)
 
     clean = tr.clean_text(blocks)
     timed = tr.timed_text(blocks)
     task = prompt_mod.build(meta, timed, opts.audience, source_note)
 
-    paths = {
-        "transcript": os.path.join(out_dir, "transcript.txt"),
-        "timed": os.path.join(out_dir, "transcript.timed.txt"),
-        "prompt": os.path.join(out_dir, "prompt.txt"),
-        "meta": os.path.join(out_dir, "meta.json"),
-    }
-    write(paths["transcript"], clean)
-    write(paths["timed"], timed)
-    write(paths["prompt"], task + "\n")
-    write(paths["meta"], json.dumps({**meta, "transcript_source": source_note},
-                                    ensure_ascii=False, indent=2) + "\n")
+    paths = {name: os.path.join(out_dir, filename) for name, filename in (
+        ("transcript", "transcript.txt"), ("timed", "transcript.timed.txt"),
+        ("prompt", "prompt.txt"), ("meta", "meta.json"))}
+    _write(paths["transcript"], clean)
+    _write(paths["timed"], timed)
+    _write(paths["prompt"], task + "\n")
+    _write(paths["meta"], json.dumps({**meta, "transcript_source": source_note},
+                                     ensure_ascii=False, indent=2) + "\n")
 
     if not opts.keep_work:
         shutil.rmtree(workdir, ignore_errors=True)
@@ -218,91 +315,19 @@ def run(opts: Options, on_step: Step = _noop) -> Result:
         return result
 
     try:
-        analysis, engine_note = analyze_text(opts, meta, timed, source_note, on_step)
-    except (local_llm.LocalLLMError, RuntimeError) as exc:
+        analysis, model_note = analyze(opts, meta, timed, source_note, on_step)
+    except (llm.LLMError, RuntimeError) as exc:
         result.analysis_error = str(exc)
         return result
 
-    result.engine_note = engine_note
+    result.model_note = model_note
     result.brief_path = os.path.join(out_dir, "brief.md")
-    brief = report.header(meta, source_note, engine_note) + analysis + "\n"
-    write(result.brief_path, brief)
+    brief = header(meta, source_note, model_note) + analysis + "\n"
+    _write(result.brief_path, brief)
     result.files["brief"] = brief
     return result
 
 
-def choose_engine(opts: Options) -> tuple[str, local_llm.Server | None]:
-    """Кем разбирать: локальной моделью или Claude. -> (движок, сервер или None).
-
-    "auto" сначала стучится в локальную модель: если она запущена, разбор идёт
-    на устройстве — без интернета, ключей и оплаты. Нет локальной — берём Claude,
-    но только если есть ключ, иначе честно говорим, чего не хватает.
-    """
-    if opts.engine == "claude":
-        return "claude", None
-    try:
-        server = local_llm.detect(opts.local_url)
-        return "local", server
-    except local_llm.LocalLLMError:
-        if opts.engine == "local":
-            raise
-        if not (opts.api_key or os.environ.get("ANTHROPIC_API_KEY")):
-            raise local_llm.LocalLLMError(
-                "Разбирать нечем: локальная модель не запущена, ключ Anthropic не задан. "
-                "Запусти Ollama (ollama serve) или добавь ключ в настройках. "
-                "Расшифровка при этом уже сохранена."
-            )
-        return "claude", None
-
-
-def analyze_local(opts: Options, server: local_llm.Server, meta: dict, timed: str,
-                  source_note: str, on_step: Step) -> tuple[str, str]:
-    """Разбор локальной моделью. Длинную расшифровку сначала сжимает по частям."""
-    model = local_llm.pick_model(server.models, opts.local_model)
-    if not model:
-        raise local_llm.LocalLLMError(
-            "На локальном сервере нет ни одной модели. Загрузи её "
-            "(например: ollama pull gemma3:12b) и повтори."
-        )
-
-    note = source_note
-    if longtext.needs_condensing(timed, opts.local_max_chars):
-        parts = longtext.split_lines(timed, opts.local_max_chars)
-        notes: list[str] = []
-        for index, part in enumerate(parts, 1):
-            on_step(f"Ролик длинный: сжимаю часть {index} из {len(parts)} ({model})")
-            notes.append(local_llm.chat(
-                server, model, prompt_mod.CONDENSE_SYSTEM,
-                prompt_mod.build_condense(part, index, len(parts)),
-                num_ctx=opts.local_ctx))
-        timed = "\n\n".join(notes)
-        note = f"{source_note}; длинный ролик сжат по частям"
-
-    task = prompt_mod.build(meta, timed, opts.audience, note)
-    on_step(f"Разбираю на устройстве: {model}")
-    text = local_llm.chat(server, model, prompt_mod.SYSTEM, task, num_ctx=opts.local_ctx)
-    return text, f"{model} (локально, {server.kind})"
-
-
-def analyze_text(opts: Options, meta: dict, timed: str, source_note: str,
-                 on_step: Step) -> tuple[str, str]:
-    """Отдаёт разбор и подпись «чем разобрано». Ошибки — понятным языком."""
-    engine, server = choose_engine(opts)
-    if engine == "local" and server is not None:
-        return analyze_local(opts, server, meta, timed, source_note, on_step)
-
-    from .analyze import AnalyzeError, analyze  # импорт тут: без ключа тоже работаем
-
-    on_step(f"Разбираю в облаке: {opts.model}")
-    try:
-        task = prompt_mod.build(meta, timed, opts.audience, source_note)
-        text = analyze(prompt_mod.SYSTEM, task, opts.model, opts.effort,
-                       opts.max_tokens, progress=False, api_key=opts.api_key)
-    except AnalyzeError as exc:
-        raise RuntimeError(str(exc)) from exc
-    return text, opts.model
-
-
-def write(path: str, content: str) -> None:
+def _write(path: str, content: str) -> None:
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(content)

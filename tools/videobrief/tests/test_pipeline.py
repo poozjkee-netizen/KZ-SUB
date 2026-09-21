@@ -11,10 +11,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(
 import shutil  # noqa: E402
 import tempfile  # noqa: E402
 
+# Настройки программы не должны утекать из системы в тест и наоборот.
+os.environ["VIDEOBRIEF_STATE_DIR"] = tempfile.mkdtemp(prefix="npbrief-cfg-")
+
 from videobrief import asr, media, pipeline, prompt as prompt_mod  # noqa: E402
 from videobrief.transcript import Segment  # noqa: E402
 from videobrief.media import meta_from_info, pick_subtitle_track  # noqa: E402
-from videobrief.report import folder_name, header, slugify  # noqa: E402
+from videobrief.pipeline import folder_name, header, slugify  # noqa: E402
 
 PRIORITY = ["ru", "en", "kk"]
 

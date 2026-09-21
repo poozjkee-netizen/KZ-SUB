@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(
 STATE = tempfile.mkdtemp(prefix="npbrief-test-")
 os.environ["VIDEOBRIEF_STATE_DIR"] = STATE
 
-from videobrief import appconfig, webapp  # noqa: E402
+from videobrief import settings as cfg, webapp  # noqa: E402
 from http.server import ThreadingHTTPServer  # noqa: E402
 
 _server = ThreadingHTTPServer(("127.0.0.1", 0), webapp.Handler)
@@ -66,19 +66,22 @@ def test_page_served_with_token():
     assert webapp.TOKEN in body
 
 
-def test_settings_roundtrip_and_key_masking():
-    out = _post("/api/settings", {"api_key": "sk-ant-secret-1234",
-                                  "audience": "стоматологи"})
+def test_settings_roundtrip():
+    out = _post("/api/settings", {"audience": "стоматологи",
+                                  "model_path": "/m/gemma.gguf", "ctx": "8192"})
     assert out["settings"]["audience"] == "стоматологи"
-    assert out["settings"]["api_key_set"] is True
-    assert out["settings"]["api_key_hint"] == "…1234"
-    # Сам ключ наружу не отдаётся.
-    assert "api_key" not in out["settings"]
-    assert "sk-ant-secret-1234" not in json.dumps(out, ensure_ascii=False)
-    # Пустое поле ключа не затирает сохранённый.
-    again = _post("/api/settings", {"api_key": "", "audience": "тренеры"})
-    assert again["settings"]["api_key_set"] is True
-    assert appconfig.load()["api_key"] == "sk-ant-secret-1234"
+    assert out["settings"]["model_path"] == "/m/gemma.gguf"
+    # Числа из окна приходят строками — на диск должны лечь числами.
+    assert out["settings"]["ctx"] == 8192
+    assert cfg.load()["audience"] == "стоматологи"
+    # Незнакомые ключи молча отбрасываются, а не засоряют файл настроек.
+    assert "мусор" not in _post("/api/settings", {"мусор": 1})["settings"]
+
+
+def test_models_listing():
+    out = json.loads(_get("/api/models")[1])
+    assert isinstance(out["models"], list)
+    assert out["dirs"]  # где искали — показываем человеку
 
 
 def test_run_requires_url():
@@ -98,7 +101,8 @@ def test_run_reports_failure_as_job_error():
         time.sleep(0.1)
     assert state["job"]["status"] == "error"
     assert state["job"]["error"]
-    assert state["busy"] is False  # слот освободился
+    # Слот освободился — иначе следующий ролик не запустится никогда.
+    assert webapp._current is None
 
 
 def run():
