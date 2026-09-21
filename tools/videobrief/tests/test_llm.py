@@ -123,6 +123,22 @@ def test_missing_library_says_what_to_install():
             sys.modules["llama_cpp"] = saved
 
 
+def test_worker_threads_leaves_room_for_the_system():
+    """Модель не должна занимать все ядра — иначе мак встаёт колом."""
+    assert llm.worker_threads(16) == 14
+    assert llm.worker_threads(4) == 2
+    assert llm.worker_threads(2) == 2   # на слабой машине меньше двух не даём
+    assert llm.worker_threads(1) == 2
+
+
+def test_generate_limits_threads_and_batch():
+    _install_fake()
+    llm.generate("/m/gemma.gguf", "с", "з", ctx=4096)
+    created = FakeLlama.created[0]
+    assert created["n_threads"] == llm.worker_threads()
+    assert created["n_batch"] == 256
+
+
 def run():
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

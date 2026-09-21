@@ -76,6 +76,18 @@ def pick(models: list[str], preferred: str = "") -> str:
     return models[0] if models else ""
 
 
+def worker_threads(cores: int | None = None) -> int:
+    """Сколько ядер отдать модели: все минус два.
+
+    Иначе машина встаёт колом: llama.cpp по умолчанию занимает все ядра, и
+    системе не остаётся ничего — курсор дёргается, окна не перерисовываются.
+    Два свободных ядра делают разбор чуть медленнее, но маком можно пользоваться,
+    пока он считает.
+    """
+    total = cores if cores is not None else (os.cpu_count() or 4)
+    return max(2, total - 2)
+
+
 def load(model_path: str, ctx: int):
     """Загружает модель и держит её в памяти до конца работы программы."""
     key = (model_path, ctx)
@@ -92,7 +104,11 @@ def load(model_path: str, ctx: int):
         model = Llama(
             model_path=model_path,
             n_ctx=ctx,
-            n_gpu_layers=-1,   # всё на видеокарту: на маке это Metal
+            n_gpu_layers=-1,          # всё на видеокарту: на маке это Metal
+            n_threads=worker_threads(),
+            # Меньший батч — ниже пики памяти при чтении длинной расшифровки.
+            # На скорость влияет слабо, на отзывчивость машины — заметно.
+            n_batch=256,
             verbose=False,
         )
     except Exception as exc:  # модель может быть битой или не влезть в память
