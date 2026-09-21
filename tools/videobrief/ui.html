@@ -312,8 +312,8 @@
 
     <div class="segmented" id="tabs">
       <button data-tab="brief" class="on">Разбор</button>
-      <button data-tab="clean">Текст</button>
-      <button data-tab="timed">Тайм-коды</button>
+      <button data-tab="script_ru">Текст ролика</button>
+      <button data-tab="original">Оригинал</button>
     </div>
     <div id="out" class="doc"></div>
   </div>
@@ -365,6 +365,10 @@
 <script>
 var TOKEN = "__TOKEN__";
 var job = null, timer = null, current = {}, tab = "brief", outDir = "";
+var EMPTY = {
+  script_ru: "Модель не выделила отдельный сценарий — он внутри разбора.",
+  original: "Расшифровка не сохранилась."
+};
 
 var ICON = {
   done: "<svg class='mark' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>",
@@ -440,9 +444,15 @@ function render() {
   if (tab === "brief") {
     box.className = "doc";
     box.innerHTML = current.brief ? md(current.brief) : "";
-  } else {
+    return;
+  }
+  var text = current[tab];
+  if (text) {
     box.className = "plain";
-    box.textContent = current[tab] || "";
+    box.textContent = text;
+  } else {
+    box.className = "doc";
+    box.innerHTML = "<p style='color:var(--ink-3)'>" + esc(EMPTY[tab] || "") + "</p>";
   }
 }
 
@@ -483,14 +493,16 @@ function finish(res) {
   document.getElementById("meta").innerHTML =
     bits.map(function (b) { return "<span>" + esc(b) + "</span>"; }).join("");
   outDir = res.out_dir;
-  current = {brief: res.brief || "", clean: res.clean || "", timed: res.timed || ""};
+  current = {brief: res.brief || "", script_ru: res.script_ru || "",
+             original: res.original || ""};
 
   var note = document.getElementById("note");
   note.hidden = !res.analysis_error;
   if (res.analysis_error) {
     document.getElementById("noteText").textContent = res.analysis_error;
   }
-  selectTab(res.brief ? "brief" : "clean");
+  // По умолчанию — всегда русский: разбор, а без него готовый текст ролика.
+  selectTab(res.brief ? "brief" : (res.script_ru ? "script_ru" : "original"));
 }
 
 // «73» ни о чём не говорит, «1 мин 13 с» — говорит.

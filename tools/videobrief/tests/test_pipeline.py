@@ -17,7 +17,8 @@ os.environ["VIDEOBRIEF_STATE_DIR"] = tempfile.mkdtemp(prefix="npbrief-cfg-")
 from videobrief import asr, media, pipeline, prompt as prompt_mod  # noqa: E402
 from videobrief.transcript import Segment  # noqa: E402
 from videobrief.media import meta_from_info, pick_subtitle_track  # noqa: E402
-from videobrief.pipeline import folder_name, header, slugify  # noqa: E402
+from videobrief.pipeline import (extract_section, folder_name,  # noqa: E402
+                                 header, slugify)
 
 PRIORITY = ["ru", "en", "kk"]
 
@@ -157,6 +158,42 @@ def test_subs_only_mode_still_fails_loudly():
     finally:
         media.probe, media.fetch_subtitles = original
         shutil.rmtree(work, ignore_errors=True)
+
+
+BRIEF = """# Разбор: ролик
+
+## 4. Структура по блокам
+
+| Тайм-код | Блок |
+|---|---|
+| 00:00 | Хук |
+
+## 5. Сценарий целиком на русском
+
+[00:00] Привет, это гайд по SP-404.
+
+[00:12] Сначала про питание.
+
+## 6. Каркас для повторного использования
+
+хук → история → вывод
+"""
+
+
+def test_extract_section_takes_one_section():
+    """Русский текст ролика достаётся из разбора, без повторного вызова модели."""
+    out = extract_section(BRIEF, 5)
+    assert out.startswith("[00:00] Привет")
+    assert "Сначала про питание" in out
+    # Соседние разделы не прилипают.
+    assert "Каркас" not in out and "Хук" not in out
+
+
+def test_extract_section_is_robust():
+    assert extract_section(BRIEF, 9) == ""          # нет такого раздела
+    assert extract_section("", 5) == ""             # пустой разбор
+    # Номер сверяется целиком: раздел 1 не должен ловиться запросом 15.
+    assert extract_section("## 1. Первый\nтекст", 15) == ""
 
 
 def run():

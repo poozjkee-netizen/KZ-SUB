@@ -40,8 +40,15 @@ def _run_job(job: dict) -> None:
     """Прогон в фоне. Шаги копятся в job['steps'] — окно их опрашивает."""
     global _current
     started = time.monotonic()
+
+    def tick(message: str) -> None:
+        """Обновляет последнюю строку статуса, пока модель пишет ответ."""
+        if job["steps"]:
+            job["steps"][-1] = message
+
     try:
-        result = pipeline.run(pipeline.Options(source=job["url"]), job["steps"].append)
+        result = pipeline.run(pipeline.Options(source=job["url"]),
+                              job["steps"].append, tick)
     except (media.MediaError, RuntimeError, OSError) as exc:
         job["status"] = "error"
         job["error"] = str(exc)
@@ -51,8 +58,9 @@ def _run_job(job: dict) -> None:
             "out_dir": result.out_dir,
             "title": result.meta.get("title") or "",
             "brief": result.files.get("brief", ""),
-            "clean": result.files.get("clean", ""),
-            "timed": result.files.get("timed", ""),
+            # Текст ролика по-русски — то, что человек читает по умолчанию.
+            "script_ru": result.files.get("script_ru", ""),
+            "original": result.files.get("timed", ""),
             "analysis_error": result.analysis_error,
             "model_note": result.model_note,
             # Сколько заняло — единственная цифра, которую человек не знает сам.

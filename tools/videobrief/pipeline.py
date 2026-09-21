@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import unicodedata
+import time
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -20,6 +21,9 @@ from . import asr, captions, llm, media, prompt as prompt_mod, transcript as tr
 from .settings import load as load_settings
 
 Step = Callable[[str], None]
+# Обновление последней строки статуса. Нужно отдельно от `on_step`: пока модель
+# пишет ответ, новых шагов нет — меняется только счётчик внутри текущего.
+Tick = Callable[[str], None]
 
 _TRANSLIT = {
     "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e",
@@ -82,6 +86,28 @@ class Result:
 
 def _noop(_: str) -> None:
     pass
+
+
+def extract_section(markdown: str, number: int) -> str:
+    """Достаёт раздел разбора по номеру: '## 5. …' до следующего '## '.
+
+    Зачем: раздел «Сценарий целиком на русском» — это и есть текст ролика
+    по-русски. Показать его отдельной вкладкой дешевле, чем гонять модель ещё
+    раз ради перевода.
+    """
+    lines = markdown.splitlines()
+    out: list[str] = []
+    taking = False
+    for line in lines:
+        if line.startswith("## "):
+            if taking:
+                break
+            head = line[3:].lstrip()
+            taking = head.startswith(f"{number}.") or head.startswith(f"{number} ")
+            continue
+        if taking:
+            out.append(line)
+    return "\n".join(out).strip()
 
 
 def _fill(meta: dict, key: str, value) -> None:
@@ -235,8 +261,27 @@ def _try_subtitles(opts: Options, info: dict, meta: dict, workdir: str,
     return segments, f"{kind} ролика, язык {lang}", is_auto
 
 
+def _live(on_tick: Tick, label: str):
+    """Колбэк для llm.generate: пишет в статус, сколько модель уже наговорила.
+
+    Без этого длинный разбор выглядит зависшим: одна строка висит минутами.
+    """
+    state = {"chars": 0, "shown": 0.0, "start": time.monotonic()}
+
+    def on_token(piece: str) -> None:
+        state["chars"] += len(piece)
+        now = time.monotonic()
+        if now - state["shown"] < 0.7:   # чаще обновлять незачем
+            return
+        state["shown"] = now
+        seconds = int(now - state["start"])
+        on_tick(f"{label} · {seconds} с, {state['chars'] // 5} слов")
+
+    return on_token
+
+
 def analyze(opts: Options, meta: dict, timed: str, source_note: str,
-            on_step: Step) -> tuple[str, str]:
+            on_step: Step, on_tick: Tick = _noop) -> tuple[str, str]:
     """Разбор локальной моделью. Длинную расшифровку сначала сжимает по частям."""
     models = llm.find_models()
     model_path = llm.pick(models, opts.model_path)
@@ -252,21 +297,24 @@ def analyze(opts: Options, meta: dict, timed: str, source_note: str,
         parts = tr.split_lines(timed, opts.max_chars)
         notes: list[str] = []
         for index, part in enumerate(parts, 1):
-            on_step(f"Ролик длинный: сжимаю часть {index} из {len(parts)}")
+            label = f"Ролик длинный: сжимаю часть {index} из {len(parts)}"
+            on_step(label)
             notes.append(llm.generate(
                 model_path, prompt_mod.CONDENSE_SYSTEM,
-                prompt_mod.build_condense(part, index, len(parts)), ctx=opts.ctx))
+                prompt_mod.build_condense(part, index, len(parts)), ctx=opts.ctx,
+                on_token=_live(on_tick, label)))
         timed = "\n\n".join(notes)
         note = f"{source_note}; длинный ролик сжат по частям"
 
-    on_step(f"Разбираю на устройстве: {name}")
+    label = f"Разбираю на устройстве: {name}"
+    on_step(label)
     task = prompt_mod.build(meta, timed, opts.audience, note)
     text = llm.generate(model_path, prompt_mod.SYSTEM, task, ctx=opts.ctx,
-                        max_tokens=8192)
+                        max_tokens=8192, on_token=_live(on_tick, label))
     return text, name
 
 
-def run(opts: Options, on_step: Step = _noop) -> Result:
+def run(opts: Options, on_step: Step = _noop, on_tick: Tick = _noop) -> Result:
     """Полный прогон. Бросает MediaError/RuntimeError, если материал не достался.
 
     Ошибка разбора прогон НЕ валит: расшифровка уже получена и стоила времени,
@@ -315,7 +363,7 @@ def run(opts: Options, on_step: Step = _noop) -> Result:
         return result
 
     try:
-        analysis, model_note = analyze(opts, meta, timed, source_note, on_step)
+        analysis, model_note = analyze(opts, meta, timed, source_note, on_step, on_tick)
     except (llm.LLMError, RuntimeError) as exc:
         result.analysis_error = str(exc)
         return result
@@ -325,6 +373,11 @@ def run(opts: Options, on_step: Step = _noop) -> Result:
     brief = header(meta, source_note, model_note) + analysis + "\n"
     _write(result.brief_path, brief)
     result.files["brief"] = brief
+    # Текст ролика по-русски — это раздел «Сценарий целиком на русском».
+    script_ru = extract_section(analysis, 5)
+    result.files["script_ru"] = script_ru
+    if script_ru:
+        _write(os.path.join(out_dir, "script.ru.txt"), script_ru + "\n")
     return result
 
 
