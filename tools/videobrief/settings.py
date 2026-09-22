@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import sys
 
 APP_NAME = "NP Brief"
@@ -65,6 +66,32 @@ def _coerce(key: str, value):
         except (TypeError, ValueError):
             return default
     return value
+
+
+def token() -> str:
+    """Постоянный токен окна: один и тот же между запусками.
+
+    Раньше он был случайным на каждый старт, и ссылку нельзя было сохранить в
+    закладки — после перезагрузки она переставала работать. Токен всё так же
+    непубличный (файл с правами 600), просто теперь живёт на диске.
+    """
+    path = os.path.join(state_dir(), "token")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            saved = fh.read().strip()
+        if saved:
+            return saved
+    except OSError:
+        pass
+    fresh = secrets.token_urlsafe(16)
+    os.makedirs(state_dir(), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(fresh)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:  # pragma: no cover — зависит от файловой системы
+        pass
+    return fresh
 
 
 def load() -> dict:

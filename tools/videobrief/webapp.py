@@ -29,7 +29,10 @@ if __package__ in (None, ""):  # запуск файлом: python webapp.py
 from . import llm, media, pipeline, settings  # noqa: E402
 
 UI_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui.html")
-TOKEN = secrets.token_urlsafe(16)
+# Адрес окна постоянный: и порт, и токен переживают перезапуск — ссылку можно
+# положить в закладки. Порт выбран из «непопулярного» диапазона.
+DEFAULT_PORT = 8765
+TOKEN = settings.token()
 
 _lock = threading.Lock()
 _jobs: dict[str, dict] = {}
@@ -169,11 +172,20 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, b"Not found", "text/plain; charset=utf-8")
 
 
-def serve(port: int = 0, open_browser: bool = True) -> None:
-    """Поднимает окно программы. port=0 — свободный порт выберет система."""
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+def serve(port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
+    """Поднимает окно программы на постоянном адресе.
+
+    Если порт занят (осталась прошлая копия программы), берём любой свободный —
+    лучше запуститься по другому адресу, чем не запуститься вовсе.
+    """
+    try:
+        httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    except OSError:
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     url = f"http://127.0.0.1:{httpd.server_address[1]}/?t={TOKEN}"
-    print(f"NP Brief: {url}", flush=True)
+    print(f"\n  NP Brief открыт: {url}\n"
+          f"  Ссылка постоянная — можно сохранить в закладки.\n"
+          f"  Закрыть программу: Ctrl+C\n", flush=True)
     if open_browser:
         threading.Timer(0.3, webbrowser.open, args=(url,)).start()
     try:
@@ -185,4 +197,4 @@ def serve(port: int = 0, open_browser: bool = True) -> None:
 
 
 if __name__ == "__main__":
-    serve(port=int(os.environ.get("VIDEOBRIEF_PORT", "0")))
+    serve(port=int(os.environ.get("VIDEOBRIEF_PORT", DEFAULT_PORT)))
